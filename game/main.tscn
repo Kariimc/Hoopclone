@@ -1,14 +1,32 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=10 format=3 uid="uid://dxa0cvk3gyv5d"]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
+[ext_resource type="Texture2D" uid="uid://b2e37h7ilrkiq" path="res://assets/textures/court_floor.png.jpeg" id="3_77ka3"]
+[ext_resource type="PackedScene" uid="uid://bjdfcbjufl34w" path="res://assets/models/player_base.glb" id="3_exa1i"]
+[ext_resource type="Script" path="res://game/player/player.gd" id="4_pqlpv"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4qycw"]
+albedo_texture = ExtResource("3_77ka3")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_1lkmb"]
+material = SubResource("StandardMaterial3D_4qycw")
+size = Vector2(28, 15)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_hylkq"]
+top_radius = 0.45
+bottom_radius = 0.45
+height = 0.02
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3fo0c"]
+albedo_color = Color(1, 0.392157, 0, 1)
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
 [node name="BroadcastCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.927, 0.374, 0, -0.374, 0.927, 0, 7, 14)
-fov = 30.0
+fov = 40.0
 script = ExtResource("2_cam")
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
@@ -18,3 +36,20 @@ shadow_enabled = true
 [node name="Floor" type="StaticBody3D" parent="."]
 
 [node name="FloorMesh" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("PlaneMesh_1lkmb")
+
+[node name="LeftHoop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 3.05, 0)
+mesh = SubResource("CylinderMesh_hylkq")
+surface_material_override/0 = SubResource("StandardMaterial3D_3fo0c")
+
+[node name="RightHoop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 3.05, 0)
+mesh = SubResource("CylinderMesh_hylkq")
+surface_material_override/0 = SubResource("StandardMaterial3D_3fo0c")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+script = ExtResource("4_pqlpv")
+
+[node name="player_base" parent="Player" instance=ExtResource("3_exa1i")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.01, 0)
