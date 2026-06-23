@@ -100,7 +100,7 @@ player) land in the asset-pipeline sprint; Sprint 1 ships logic + anchors.
 
 - [x] **Sprint 0** — playable design sandbox (`hoopclone_mvp.html`)
 - [x] **Sprint 1** — engine spine: camera, player/anim/hair, attribute model, Python data pipeline (this repo)
-- [ ] **Sprint 2** — shot + ball physics (green-zone meter, rim/backboard)
+- [x] **Sprint 2** — shot + ball physics (green-zone meter, rim/backboard, shot model)
 - [ ] **Sprint 3** — data engine hardening (percentile pools, full league import, live feed polish)
 - [ ] **Sprint 4** — asset pipeline + AnimationTree blend trees + rigged hair write-back
 - [ ] **Sprint 5** — box-score simulator (sim/spectate/play)
