@@ -37,9 +37,9 @@ func update_locomotion_blend(speed: float) -> void:
 	_tree.set("parameters/Locomotion/blend_position", t)
 
 func _on_state_changed(_from: int, to: int) -> void:
-	if _playback == null:
+	if _playback == null or _tree == null:
 		return
-	var name := AnimStateMachine.State.keys()[to]
+	var state_name := AnimStateMachine.State.keys()[to]
 	# Locomotion states all live inside the "Locomotion" blend node.
 	if to in [
 		AnimStateMachine.State.IDLE, AnimStateMachine.State.WALK,
@@ -47,7 +47,7 @@ func _on_state_changed(_from: int, to: int) -> void:
 	]:
 		_travel("Locomotion")
 	else:
-		_travel(name)
+		_travel(state_name)
 
 func _travel(state_name: String) -> void:
 	# Only travel if the tree actually has that state, so a missing clip during
