@@ -38,7 +38,8 @@ Stdlib-only for the core; `nba_api` only needed for live fetches.
 | `sources/nba_api_source.py` | nba_api adapter (import-guarded) |
 | `sources/mock_source.py` | deterministic offline source for tests/demos |
 | `normalize.py` | raw stats → 13 attributes (0-99); percentile + linear-scale paths, position baselines, manual overrides |
-| `export_roster.py` | CLI: fetch → normalize → write roster JSON for Godot |
+| `export_roster.py` | CLI: one team, absolute ratings → roster JSON |
+| `export_league.py` | CLI: full multi-team league, **pool-normalised** → league JSON |
 | `live_service.py` | localhost service feeding the scorebug + ticker |
 | `tests/test_normalize.py` | pytest: range + monotonicity + baselines + overrides |
 
@@ -101,7 +102,7 @@ player) land in the asset-pipeline sprint; Sprint 1 ships logic + anchors.
 - [x] **Sprint 0** — playable design sandbox (`hoopclone_mvp.html`)
 - [x] **Sprint 1** — engine spine: camera, player/anim/hair, attribute model, Python data pipeline (this repo)
 - [x] **Sprint 2** — shot + ball physics (green-zone meter, rim/backboard, shot model)
-- [ ] **Sprint 3** — data engine hardening (percentile pools, full league import, live feed polish)
+- [x] **Sprint 3** — data engine hardening (percentile pools, full league import, live-feed polish)
 - [ ] **Sprint 4** — asset pipeline + AnimationTree blend trees + rigged hair write-back
 - [ ] **Sprint 5** — box-score simulator (sim/spectate/play)
 - [ ] **Sprint 6** — Season / Franchise

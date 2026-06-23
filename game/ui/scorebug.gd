@@ -39,7 +39,21 @@ func _on_scores(_r: int, code: int, _h: PackedStringArray, body: PackedByteArray
 	_set_label("%Home", g.get("home", "HOM"))
 	_set_label("%AwayScore", str(g.get("away_score", 0)))
 	_set_label("%HomeScore", str(g.get("home_score", 0)))
-	_set_label("%Clock", g.get("status", ""))
+	# Prefer a "Qn  M:SS" clock when period/clock are present (Sprint 3 schema).
+	var period: int = int(g.get("period", 0))
+	var clock: String = String(g.get("clock", ""))
+	if period > 0:
+		_set_label("%Clock", "Q%d  %s" % [period, clock])
+	else:
+		_set_label("%Clock", g.get("status", ""))
+	# Bonus indicators light up when a team is in the penalty.
+	_toggle("%HomeBonus", bool(g.get("home_bonus", false)))
+	_toggle("%AwayBonus", bool(g.get("away_bonus", false)))
+
+func _toggle(path: String, on: bool) -> void:
+	var n := get_node_or_null(path)
+	if n is CanvasItem:
+		(n as CanvasItem).visible = on
 
 func _set_label(path: String, text: String) -> void:
 	var n := get_node_or_null(path)
