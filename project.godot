@@ -1,0 +1,25 @@
+; HoopClone — Godot 4 project
+; Engine: Godot 4.x (forward+ renderer for PBR arena + stylized players)
+
+config_version=5
+
+[application]
+config/name="HoopClone"
+config/description="Data-driven basketball simulation (Hoop Land-inspired)."
+run/main_scene="res://game/main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+config/icon="res://icon.svg"
+
+[rendering]
+renderer/rendering_method="forward_plus"
+environment/defaults/default_clear_color=Color(0.043, 0.055, 0.075, 1)
+
+[physics]
+common/physics_ticks_per_second=60
+
+[input]
+move_left={ "deadzone":0.2,"events":[] }
+move_right={ "deadzone":0.2,"events":[] }
+move_up={ "deadzone":0.2,"events":[] }
+move_down={ "deadzone":0.2,"events":[] }
+shoot={ "deadzone":0.2,"events":[] }

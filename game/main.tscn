@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://b8hoopclonemain0"]
+
+[ext_resource type="Script" path="res://game/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="BroadcastCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.927, 0.374, 0, -0.374, 0.927, 0, 7, 14)
+fov = 30.0
+script = ExtResource("2_cam")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.86, -0.35, 0.37, 0, 0.72, 0.69, -0.5, -0.6, 0.62, 0, 12, 0)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="FloorMesh" type="MeshInstance3D" parent="Floor"]

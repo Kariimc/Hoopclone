@@ -1,0 +1,14 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Generated rosters (regenerate via export_roster.py); keep a sample if useful
+# data/rosters/*.json

@@ -1,0 +1,135 @@
+{
+  "name": "HoopClone League",
+  "season": "2025-26",
+  "teams": [
+    {
+      "team_id": "crw",
+      "name": "Crimson Wolves",
+      "abbreviation": "CRW",
+      "primary_color": "#7a0019",
+      "secondary_color": "#0b0e13",
+      "players": [
+        {
+          "player_id": "crw-00",
+          "name": "Alpha Guard",
+          "position": "C",
+          "jersey": 3,
+          "archetype": "",
+          "asset_id": "",
+          "overall": 37,
+          "attributes": {
+            "shooting": 40,
+            "three_pt": 73,
+            "finishing": 24,
+            "dunking": 74,
+            "passing": 7,
+            "handles": 12,
+            "steals": 25,
+            "hustle": 28,
+            "hops": 44,
+            "rebounding": 1,
+            "perim_d": 41,
+            "inside_d": 50,
+            "speed": 58
+          }
+        },
+        {
+          "player_id": "crw-01",
+          "name": "Bravo Wing",
+          "position": "C",
+          "jersey": 10,
+          "archetype": "",
+          "asset_id": "",
+          "overall": 42,
+          "attributes": {
+            "shooting": 55,
+            "three_pt": 69,
+            "finishing": 33,
+            "dunking": 74,
+            "passing": 25,
+            "handles": 28,
+            "steals": 32,
+            "hustle": 36,
+            "hops": 45,
+            "rebounding": 2,
+            "perim_d": 43,
+            "inside_d": 51,
+            "speed": 58
+          }
+        },
+        {
+          "player_id": "crw-02",
+          "name": "Charlie Big",
+          "position": "PG",
+          "jersey": 17,
+          "archetype": "",
+          "asset_id": "",
+          "overall": 51,
+          "attributes": {
+            "shooting": 35,
+            "three_pt": 82,
+            "finishing": 17,
+            "dunking": 55,
+            "passing": 42,
+            "handles": 46,
+            "steals": 63,
+            "hustle": 71,
+            "hops": 48,
+            "rebounding": 27,
+            "perim_d": 61,
+            "inside_d": 30,
+            "speed": 82
+          }
+        },
+        {
+          "player_id": "crw-03",
+          "name": "Delta Slash",
+          "position": "SF",
+          "jersey": 24,
+          "archetype": "",
+          "asset_id": "",
+          "overall": 54,
+          "attributes": {
+            "shooting": 73,
+            "three_pt": 85,
+            "finishing": 25,
+            "dunking": 64,
+            "passing": 25,
+            "handles": 32,
+            "steals": 30,
+            "hustle": 34,
+            "hops": 76,
+            "rebounding": 67,
+            "perim_d": 54,
+            "inside_d": 64,
+            "speed": 74
+          }
+        },
+        {
+          "player_id": "crw-04",
+          "name": "Echo Anchor",
+          "position": "SG",
+          "jersey": 31,
+          "archetype": "",
+          "asset_id": "",
+          "overall": 41,
+          "attributes": {
+            "shooting": 29,
+            "three_pt": 63,
+            "finishing": 4,
+            "dunking": 60,
+            "passing": 45,
+            "handles": 49,
+            "steals": 15,
+            "hustle": 17,
+            "hops": 64,
+            "rebounding": 13,
+            "perim_d": 48,
+            "inside_d": 47,
+            "speed": 78
+          }
+        }
+      ]
+    }
+  ]
+}

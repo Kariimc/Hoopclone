@@ -1,0 +1,8 @@
+# HoopClone data toolchain dependencies
+# Core normalisation + export use stdlib only — nothing required for tests.
+
+# Live import + live scores/ticker:
+nba_api>=1.11.0
+
+# Dev / CI:
+pytest>=8.0

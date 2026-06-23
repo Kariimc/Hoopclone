@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<!--
+  HOOPCLONE — MVP DESIGN SANDBOX (Sprint 0 · broadcast layout + TV UI)
+  ===================================================================
+  This rev:
+    - courtside furniture relocated to match real NBA broadcast layout:
+        * FAR sideline (facing camera): HOME + AWAY benches with the
+          scorer's table / commentators desk centered between them
+        * NEAR + FAR sidelines: ~3 rows of courtside fans
+        * behind each basket (no barrier): fans with poppers, wavy sticks,
+          big-head cutouts, ~4ft off the stanchion
+    - ESPN-style compact SCOREBUG, bottom-right, out of the way
+    - NEWS TICKER slowed and pinned to the very bottom-left, text guaranteed visible
+  Benches still HYPE (arms up / bob) on made shots — placeholder for the
+  event-driven bench emote system in the real build.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HoopClone — MVP Sandbox</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--line:#2b3340;--ink:#e6edf3;--mut:#8b949e;
+    --accent:#f0883e;--good:#3fb950;--bad:#f85149;--home:#e8533a;--away:#2d6cdf;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{display:flex;gap:14px;height:100%;padding:14px;align-items:stretch}
+  .stage{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .court-wrap{position:relative;flex:1;min-height:0;display:flex}
+  canvas{width:100%;flex:1;border:1px solid var(--line);border-radius:10px;
+    background:#0a0f16;display:block;image-rendering:pixelated}
+  .hud{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut)}
+  .hud b{color:var(--ink)}
+  .panel{width:300px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:14px;overflow:auto}
+  h1{font-size:15px;margin:0 0 2px;letter-spacing:.5px;color:var(--accent)}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);
+    margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
+  h2:first-of-type{border-top:0;padding-top:0;margin-top:14px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 0}
+  .row label{color:var(--mut);font-size:12px}
+  .row .val{color:var(--ink);min-width:26px;text-align:right;font-weight:700}
+  input[type=range]{width:140px;accent-color:var(--accent)}
+  input[type=text]{width:100%;background:#0d1117;border:1px solid var(--line);
+    color:var(--ink);border-radius:6px;padding:7px 9px;font:inherit}
+  button{background:var(--accent);color:#0d1117;border:0;border-radius:6px;
+    padding:8px 10px;font:inherit;font-weight:700;cursor:pointer;width:100%}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{background:#21262d;border:1px solid var(--line);border-radius:20px;
+    padding:4px 10px;font-size:11px;cursor:pointer;color:var(--mut)}
+  .chip:hover{border-color:var(--accent);color:var(--ink)}
+  .log{margin-top:8px;font-size:11px;color:var(--mut);height:90px;overflow:auto;
+    border:1px solid var(--line);border-radius:6px;padding:8px;background:#0d1117}
+  .log .hit{color:var(--good)} .log .miss{color:var(--bad)}
+  .note{font-size:11px;color:var(--mut);margin-top:10px;line-height:1.45}
+  kbd{background:#21262d;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:4px;padding:1px 5px;font-size:11px}
+
+  /* ---- NBC/Peacock-style scorebug (very bottom-right corner) ---- */
+  #scorebug{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;
+    pointer-events:none;border:1px solid #000;border-radius:5px;overflow:hidden;
+    box-shadow:0 5px 16px rgba(0,0,0,.55);font-weight:800}
+  #scorebug .main{display:flex;align-items:stretch;height:32px}
+  #scorebug .cap{display:flex;align-items:center;gap:5px;padding:0 8px;color:#fff;
+    font-size:11px;letter-spacing:.5px}
+  #scorebug .cap.home{background:linear-gradient(180deg,#e8533a,#b53a26)}
+  #scorebug .cap.away{background:linear-gradient(180deg,#2d6cdf,#1b4fa8)}
+  #scorebug .cap .lo{width:15px;height:15px;border-radius:50%;background:#ffffff33;border:1px solid #ffffff55}
+  #scorebug .sc{display:flex;align-items:center;background:#0e1218;color:#fff;font-size:17px;padding:0 8px}
+  #scorebug .sc.lead{color:var(--accent)}
+  #scorebug .sc .br{color:#3a4654;font-weight:400;font-size:18px;padding:0 2px}
+  #scorebug .mid{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:#080b10;padding:0 9px;min-width:50px}
+  #scorebug .mid .q{font-size:9px;color:var(--accent)}
+  #scorebug .mid .ck{font-size:12px;color:#fff}
+  #scorebug .foul{display:flex;justify-content:space-between;gap:12px;background:#06080c;
+    color:#8b949e;font-size:8px;padding:2px 9px;letter-spacing:.5px;font-weight:700}
+
+  /* ---- news ticker (top-left, horizontal, pops in with scrolling text) ---- */
+  #newspop{position:absolute;left:12px;top:12px;display:flex;align-items:stretch;
+    height:28px;width:46%;max-width:520px;background:#0b0e13f2;border:1px solid #000;border-radius:5px;
+    box-shadow:0 6px 18px rgba(0,0,0,.55);overflow:hidden;
+    opacity:0;transform:translateX(-14px);transition:opacity .35s ease,transform .35s ease;
+    pointer-events:none}
+  #newspop.show{opacity:1;transform:translateX(0)}
+  #newspop .hd{display:flex;align-items:center;gap:6px;background:var(--accent);color:#0a0f16;
+    padding:0 9px;font-weight:800;flex:0 0 auto}
+  #newspop .hd .dot{width:6px;height:6px;border-radius:50%;background:#0a0f16}
+  #newspop .hd .lbl{font:800 9px ui-monospace,monospace;letter-spacing:1px;white-space:nowrap}
+  #newspop .win{flex:1;overflow:hidden;display:flex;align-items:center}
+  #newspop .track{display:inline-block;white-space:nowrap;padding-left:100%;
+    font:600 12px ui-monospace,monospace;color:#e6edf3;animation:tkscroll 9s linear}
+  #newspop .track b{color:var(--accent)} #newspop .track .sc{color:var(--accent)}
+  @keyframes tkscroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <div class="court-wrap">
+      <canvas id="c"></canvas>
+      <div id="scorebug">
+        <div class="main">
+          <div class="cap home"><span>HOM</span><span class="lo"></span></div>
+          <div class="sc" id="sb-thome"><span id="sb-home">0</span><span class="br">{</span></div>
+          <div class="mid"><span class="q" id="sb-q">Q2</span><span class="ck" id="sb-clock">10:28</span></div>
+          <div class="sc lead" id="sb-taway"><span class="br">}</span><span id="sb-away">32</span></div>
+          <div class="cap away"><span class="lo"></span><span>AWY</span></div>
+        </div>
+        <div class="foul"><span>FOULS 3</span><span>NBA MONDAY</span><span>BONUS</span></div>
+      </div>
+      <div id="newspop">
+        <div class="hd"><span class="dot"></span><span class="lbl" id="np-lbl">NBA · BREAKING</span></div>
+        <div class="win"><div class="track" id="np-body"></div></div>
+      </div>
+    </div>
+    <div class="hud">
+      <span>USER <b id="u-name">Player 1</b></span>
+      <span>FG <b id="u-fg">0/0</b></span>
+      <span>3PT <b id="u-3p">0/0</b></span>
+      <span>Release: <b id="u-rel">—</b></span>
+      <span><kbd>WASD</kbd> move · <kbd>SPACE</kbd> shoot · <kbd>R</kbd> reset</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h1>HOOPCLONE · MVP</h1>
+    <div class="note">Sprint-0 sandbox. Benches + scorer's table on the far side facing camera, fan rows near/far, no-barrier fans behind the baskets, ESPN-style scorebug + slow ticker.</div>
+
+    <h2>Import via URL <span style="text-transform:none;color:var(--mut)">(adapter sim)</span></h2>
+    <input id="url" type="text" placeholder="player name or stat URL…" value="stephen curry" />
+    <div style="height:8px"></div>
+    <button id="import">Fetch &amp; Normalize → 0-99</button>
+    <div class="chips" id="presets"></div>
+
+    <h2>Attribute Engine</h2>
+    <div id="sliders"></div>
+
+    <h2>Result Log</h2>
+    <div class="log" id="log"></div>
+
+    <div class="note">Scorebug + ticker read the <b>StatSource</b> adapter in production (live scores/stats) plus a news feed for headlines.</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===== 1. ATTRIBUTE MODEL ===== */
+const ATTRS=["Shooting","ThreePT","Finishing","Dunking","Passing","Handles","Steals","Hustle","Hops","Rebounding","PerimD","InsideD","Speed"];
+function blankPlayer(name){const a={};ATTRS.forEach(k=>a[k]=70);return {name,attr:a,fg:[0,0],tp:[0,0]};}
+
+/* ===== 2. NORMALIZATION (adapter sim) ===== */
+const STAT_DB={
+  "stephen curry":{Shooting:97,ThreePT:99,Finishing:82,Dunking:55,Passing:86,Handles:95,Steals:80,Hustle:84,Hops:70,Rebounding:55,PerimD:74,InsideD:60,Speed:88},
+  "lebron james":{Shooting:82,ThreePT:80,Finishing:95,Dunking:96,Passing:96,Handles:90,Steals:82,Hustle:88,Hops:90,Rebounding:82,PerimD:84,InsideD:85,Speed:86},
+  "nikola jokic":{Shooting:86,ThreePT:78,Finishing:92,Dunking:60,Passing:99,Handles:84,Steals:78,Hustle:80,Hops:55,Rebounding:95,PerimD:70,InsideD:88,Speed:64},
+  "victor wembanyama":{Shooting:80,ThreePT:78,Finishing:88,Dunking:92,Passing:78,Handles:74,Steals:88,Hustle:86,Hops:88,Rebounding:94,PerimD:84,InsideD:97,Speed:80},
+};
+function hashStats(str){let h=2166136261;for(const ch of str){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}const a={};ATTRS.forEach((k,i)=>{a[k]=45+((h>>(i%24))&0x3f);});return a;}
+function resolveStatSource(query){
+  const key=query.trim().toLowerCase().replace(/^https?:\/\/[^ ]*\//,"").replace(/[-_/]/g," ").trim();
+  const block=STAT_DB[key]||hashStats(key);
+  const name=(STAT_DB[key]?key.replace(/\b\w/g,c=>c.toUpperCase()):"Imported: "+query.slice(0,18));
+  return {name,attr:Object.assign({},block)};
+}
+
+/* ===== 3. WORLD + HORIZONTAL BROADCAST CAMERA ===== */
+const cv=document.getElementById("c"), ctx=cv.getContext("2d");
+let W=0,H=0; function fit(){W=cv.width=cv.clientWidth*devicePixelRatio;H=cv.height=cv.clientHeight*devicePixelRatio;}
+addEventListener("resize",fit);
+
+const COURT={len:100, wid:50};
+const HOOP ={x:93, z:25, h:10};
+const LHOOP={x:7,  z:25, h:10};
+const CAM={yNear:0.74, yFar:0.48, depthFalloff:0.34};
+function PX(){return (W*0.98)/COURT.len;}
+function UNIT(){return Math.min(H/40, PX()*1.3);}
+function proj(x,z,height=0){
+  const t=Math.max(0,Math.min(1,z/COURT.wid));
+  const depth=1.0 - CAM.depthFalloff*t;
+  const floorY=H*(CAM.yNear+(CAM.yFar-CAM.yNear)*t);
+  const px=W*0.5 + (x-COURT.len/2)*PX()*depth;
+  const py=floorY - height*UNIT()*0.78*depth;
+  return {px,py,s:depth*UNIT()};
+}
+
+const user=blankPlayer("Player 1"); user.x=50; user.z=30;
+const cpu =blankPlayer("Defender"); cpu.x=74;  cpu.z=26; cpu.cpu=true;
+const ball={x:50,z:30,h:2,vx:0,vz:0,vh:0,live:false,holder:user};
+let hype=0;
+
+/* ===== input ===== */
+const keys={};
+addEventListener("keydown",e=>{if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==="r")resetBall();});
+addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false;});
+
+/* ===== shot charge / meter ===== */
+let charge=0, charging=false;
+function startCharge(){if(ball.holder===user&&!ball.live){charging=true;charge=0;}}
+function releaseShot(){
+  if(!charging)return; charging=false;
+  const a=user.attr, dist=Math.hypot(user.x-HOOP.x,user.z-HOOP.z), isThree=dist>22;
+  const shootAttr=isThree?a.ThreePT:a.Shooting;
+  const green=0.10+0.0035*shootAttr, center=0.82, timing=Math.abs(charge-center);
+  const perfect=timing<green*0.5, good=timing<green;
+  const cd=Math.hypot(cpu.x-user.x,cpu.z-user.z), contest=Math.max(0,1-cd/10);
+  let p=(shootAttr/100)*0.62+(perfect?0.30:good?0.12:-0.05);
+  p-=(isThree?0.18:0)+dist*0.006+contest*0.28*(1-shootAttr/160);
+  p=Math.max(0.02,Math.min(0.97,p));
+  ball.live=true; ball.holder=null; ball.x=user.x; ball.z=user.z; ball.h=2+a.Hops*0.02;
+  const t=0.9;
+  ball.vx=(HOOP.x-ball.x)/t; ball.vz=(HOOP.z-ball.z)/t; ball.vh=(HOOP.h-ball.h)/t+0.5*22*t;
+  ball._made=Math.random()<p; ball._three=isThree; ball._t=0;
+  document.getElementById("u-rel").textContent=perfect?"PERFECT":good?"good":"early/late";
+  log(`${isThree?"3PT":"2PT"} @ ${dist.toFixed(0)}ft · ${(p*100|0)}% · ${perfect?"PERFECT":good?"good":"off"}`,null);
+}
+function resetBall(){ball.live=false;ball.holder=user;ball.x=user.x;ball.z=user.z;ball.h=2;ball.vx=ball.vz=ball.vh=0;}
+
+/* ===== sim step ===== */
+let last=performance.now();
+function step(now){
+  const dt=Math.min(0.033,(now-last)/1000); last=now;
+  const a=user.attr, spd=16+a.Speed*0.12+a.Handles*0.05;
+  let mx=0,mz=0;
+  if(keys.a||keys.arrowleft)mx-=1; if(keys.d||keys.arrowright)mx+=1;
+  if(keys.w||keys.arrowup)mz+=1;   if(keys.s||keys.arrowdown)mz-=1;
+  const ml=Math.hypot(mx,mz)||1; user.x+=mx/ml*spd*dt; user.z+=mz/ml*spd*dt;
+  user.x=Math.max(3,Math.min(97,user.x)); user.z=Math.max(6,Math.min(46,user.z));
+  if(ball.holder===user){ball.x=user.x;ball.z=user.z;ball.h=2;}
+  if(charging){charge+=dt*1.35; if(charge>1.05)releaseShot();}
+  if(keys[" "]&&!charging&&ball.holder===user&&!ball.live)startCharge();
+  if(!keys[" "]&&charging)releaseShot();
+  if(!ball.live){
+    const dx=user.x-cpu.x,dz=user.z-cpu.z,d=Math.hypot(dx,dz)||1, cs=12+cpu.attr.Speed*0.07;
+    cpu.x+=dx/d*cs*dt*0.7; cpu.z+=dz/d*cs*dt*0.7;
+    if(d<4){cpu.x-=dx/d*1.2;cpu.z-=dz/d*1.2;}
+  }
+  if(ball.live){
+    ball._t+=dt; ball.x+=ball.vx*dt; ball.z+=ball.vz*dt; ball.h+=ball.vh*dt; ball.vh-=22*dt;
+    const dHoop=Math.hypot(ball.x-HOOP.x,ball.z-HOOP.z);
+    if(ball._t>0.85 || (ball.h<=HOOP.h+0.5 && dHoop<3)){
+      if(ball._made){user.fg[0]++; if(ball._three)user.tp[0]++; hype=1; log("SWISH","hit");}
+      else log("rim out","miss");
+      user.fg[1]++; if(ball._three)user.tp[1]++; updHud(); setTimeout(resetBall,500); ball.live=false;
+    }
+  }
+  hype*=0.96;
+  // scorebug score + leader highlight
+  const hs=user.fg[0]*2, as=32;
+  document.getElementById("sb-home").textContent=hs;
+  document.getElementById("sb-thome").classList.toggle("lead",hs>as);
+  document.getElementById("sb-taway").classList.toggle("lead",as>=hs);
+  draw(); requestAnimationFrame(step);
+}
+
+/* ===== 4. RENDER ===== */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawArena(); drawCourt(); drawFarSide();
+  const ents=[user,cpu].sort((p,q)=>q.z-p.z);
+  for(const e of ents) drawPlayer(e);
+  drawBall();
+  drawNearFans(); drawBaselineFans(); drawCams();
+  if(charging) drawMeter();
+}
+function drawArena(){
+  const farY=H*CAM.yFar, topY=H*0.05;
+  ctx.fillStyle="#0a0f16"; ctx.fillRect(0,0,W,farY);
+  const rows=6, perRow=Math.max(52,(W/9)|0);
+  for(let r=0;r<rows;r++){
+    const y=topY+(farY*0.62-topY)*(r/rows), sz=Math.max(2,(farY-topY)/rows*0.5);
+    for(let i=0;i<perRow;i++){
+      const x=(i+(r%2?0.5:0))*(W/perRow), c=(i*7+r*13)%5;
+      ctx.fillStyle=["#1d2733","#243042","#2a2030","#22303a","#2d2a22"][c];
+      ctx.fillRect(x,y,sz,sz);
+    }
+  }
+  ctx.fillStyle="#11161d"; ctx.fillRect(0,farY*0.66,W,H*0.01);  // upper barrier (stands behind)
+}
+function quad(x0,z0,x1,z1,x2,z2,x3,z3){const a=proj(x0,z0),b=proj(x1,z1),c=proj(x2,z2),d=proj(x3,z3);ctx.beginPath();ctx.moveTo(a.px,a.py);ctx.lineTo(b.px,b.py);ctx.lineTo(c.px,c.py);ctx.lineTo(d.px,d.py);ctx.closePath();}
+function arc(cx,cz,r,a0,a1){ctx.beginPath();const N=44;for(let i=0;i<=N;i++){const ang=a0+(a1-a0)*i/N;const rx=cx+Math.cos(ang)*r,rz=cz+Math.sin(ang)*r;const q=proj(rx,Math.max(2,Math.min(48,rz)));i?ctx.lineTo(q.px,q.py):ctx.moveTo(q.px,q.py);}ctx.stroke();}
+function drawCourt(){
+  ctx.fillStyle="#c8823f"; quad(0,0,100,0,100,50,0,50); ctx.fill();
+  ctx.strokeStyle="rgba(0,0,0,.06)";ctx.lineWidth=1;
+  for(let x=0;x<=100;x+=6){const a=proj(x,0),b=proj(x,50);ctx.beginPath();ctx.moveTo(a.px,a.py);ctx.lineTo(b.px,b.py);ctx.stroke();}
+  ctx.fillStyle="#b3622f"; quad(81,17,100,17,100,33,81,33); ctx.fill();
+  quad(0,17,19,17,19,33,0,33); ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=Math.max(1,W/760);
+  arc(HOOP.x,HOOP.z,23, Math.PI*0.5, Math.PI*1.5);
+  arc(LHOOP.x,LHOOP.z,23, -Math.PI*0.5, Math.PI*0.5);
+  const m0=proj(50,0),m1=proj(50,50);ctx.beginPath();ctx.moveTo(m0.px,m0.py);ctx.lineTo(m1.px,m1.py);ctx.stroke();
+  arc(50,25,8,0,Math.PI*2);
+  drawHoop(LHOOP,-1); drawHoop(HOOP,1);
+}
+function drawHoop(Hp, side){
+  const baseX=side>0?100:0, boardX=side>0?98:2;
+  const foot=proj(baseX,Hp.z,0), top=proj(baseX,Hp.z,13);
+  const board=proj(boardX,Hp.z,11), rim=proj(Hp.x,Hp.z,Hp.h), s=rim.s;
+  ctx.strokeStyle="#7f8893";ctx.lineWidth=Math.max(2,s*0.5);
+  ctx.beginPath();ctx.moveTo(foot.px,foot.py);ctx.lineTo(top.px,top.py);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(top.px,top.py);ctx.lineTo(board.px,board.py);ctx.stroke();
+  const bw=Math.max(3,s*0.7), bh=Math.max(8,s*2.4);
+  ctx.fillStyle="rgba(255,255,255,.92)";ctx.fillRect(board.px-bw/2,board.py-bh*0.6,bw,bh);
+  ctx.strokeStyle="#c0451f";ctx.lineWidth=Math.max(1,s*0.16);ctx.strokeRect(board.px-bw/2,board.py-bh*0.6,bw,bh);
+  ctx.strokeStyle="#f0883e";ctx.lineWidth=Math.max(2,s*0.32);
+  ctx.beginPath();ctx.ellipse(rim.px,rim.py,s*1.5,s*0.55,0,0,7);ctx.stroke();
+  ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=Math.max(1,s*0.1);
+  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(rim.px+i*s*0.55,rim.py);ctx.lineTo(rim.px+i*s*0.22,rim.py+s*1.3);ctx.stroke();}
+}
+function drawPlayer(e){
+  const p=proj(e.x,e.z,0), s=p.s;
+  ctx.fillStyle="rgba(0,0,0,.32)";ctx.beginPath();ctx.ellipse(p.px,p.py,s*1.9,s*0.7,0,0,7);ctx.fill();
+  const jersey=e.cpu?["#2d6cdf","#1b4fa8"]:["#e8533a","#b53a26"];
+  vox(p.px,p.py-s*1.9,s*2.0,s*2.1,"#3a2c25","#241b16");
+  vox(p.px,p.py-s*3.8,s*2.4,s*2.3,jersey[0],jersey[1]);
+  vox(p.px,p.py-s*5.3,s*1.5,s*1.6,"#6b4a36","#4f3527");
+  ctx.fillStyle="rgba(255,255,255,.9)";ctx.font=`700 ${s*1.3|0}px monospace`;ctx.textAlign="center";
+  ctx.fillText(e.cpu?"00":"30",p.px,p.py-s*3.4);
+}
+function vox(cx,cy,w,h,front,side){ctx.fillStyle=side;ctx.fillRect(cx-w/2+w*0.12,cy-h,w,h);ctx.fillStyle=front;ctx.fillRect(cx-w/2,cy-h,w,h);}
+function drawBall(){
+  const p=proj(ball.x,ball.z,ball.h),s=p.s,g=proj(ball.x,ball.z,0);
+  ctx.fillStyle="rgba(0,0,0,.25)";ctx.beginPath();ctx.ellipse(g.px,g.py,s*0.7,s*0.26,0,0,7);ctx.fill();
+  ctx.fillStyle="#e07b32";ctx.beginPath();ctx.arc(p.px,p.py,s*0.75,0,7);ctx.fill();
+  ctx.strokeStyle="#5e3214";ctx.lineWidth=Math.max(1,s*0.12);
+  ctx.beginPath();ctx.moveTo(p.px-s*0.75,p.py);ctx.lineTo(p.px+s*0.75,p.py);ctx.stroke();
+}
+
+/* ---- courtside: FAR benches + scorer's table (facing camera), with hype ---- */
+function miniFan(x,y,u,col,arms){
+  ctx.fillStyle=col; ctx.fillRect(x-u*0.32,y-u*0.95,u*0.64,u*0.95);
+  ctx.fillStyle="#6b4a36"; ctx.fillRect(x-u*0.2,y-u*1.34,u*0.4,u*0.4);
+  if(arms){ctx.fillStyle=col;ctx.fillRect(x-u*0.5,y-u*1.7,u*0.18,u*0.8);ctx.fillRect(x+u*0.32,y-u*1.7,u*0.18,u*0.8);}
+}
+function drawFarSide(){
+  const farY=H*CAM.yFar, u=proj(50,50).s;
+  // scorer's table / commentators desk (centered)
+  const dL=proj(35,50), dR=proj(65,50);
+  ctx.fillStyle="#12161d"; ctx.fillRect(dL.px, farY-u*1.4, dR.px-dL.px, u*1.4);
+  ctx.fillStyle="#0a0f16"; ctx.fillRect(dL.px, farY-u*1.4, dR.px-dL.px, u*0.5);
+  ctx.fillStyle="#1f6feb"; ctx.fillRect(dL.px, farY-u*0.5, dR.px-dL.px, u*0.12); // LED strip
+  for(let i=0;i<6;i++){const x=dL.px+(dR.px-dL.px)*(i+0.5)/6; miniFan(x,farY-u*1.4,u*0.8,"#3a4654",false);}
+  // benches flanking the desk (home red left, away blue right) — hype reacts
+  benchRow(13,33,"#e8533a",farY,u);
+  benchRow(67,87,"#2d6cdf",farY,u);
+}
+function benchRow(x0,x1,col,farY,u){
+  const L=proj(x0,50), R=proj(x1,50), n=8;
+  for(let i=0;i<n;i++){
+    const x=L.px+(R.px-L.px)*(i+0.5)/n;
+    const bob=Math.abs(Math.sin(performance.now()/170+i+x))*hype*u*1.3;
+    miniFan(x, farY-bob, u, col, hype>0.4);
+  }
+}
+/* ---- near (camera-side) courtside crowd: fills the bottom of the screen ---- */
+function crowdRow(y,u,seed){
+  const pal=["#3a4654","#4a3a44","#445064","#54463a","#3a5048","#5a4a3a","#444f5e","#503a4a"];
+  const cols=Math.ceil(W/(u*0.92))+1;
+  for(let i=0;i<cols;i++){
+    const x=(i*(W/cols)) + ((i*13+seed)%5-2)*u*0.06;
+    ctx.fillStyle=pal[(i*7+seed)%pal.length];
+    ctx.fillRect(x-u*0.46,y-u*0.95,u*0.92,u*0.95);                 // shoulders
+    ctx.fillStyle="#6b4a36";
+    ctx.beginPath();ctx.arc(x,y-u*1.08,u*0.36,0,7);ctx.fill();      // head
+  }
+}
+function drawNearFans(){
+  const baseY=H*CAM.yNear, band=H-baseY;            // space from near line to bottom edge
+  // back-to-front: smaller/higher first, biggest row sits at the very bottom
+  crowdRow(baseY+band*0.22, band*0.20, 1);
+  crowdRow(baseY+band*0.55, band*0.27, 4);
+  crowdRow(baseY+band*0.96, band*0.36, 7);
+}
+/* ---- behind-basket fans (no barrier): poppers, wavy sticks, big-head cutouts ---- */
+function drawBaselineFans(){ baselineCluster(-3); baselineCluster(103); }
+function baselineCluster(xc){
+  const pal=["#c8434a","#3a6cc8","#46a05a","#c89a3a","#8a4ac8"];
+  for(let i=0;i<6;i++){
+    const z=14+i*3.4, off=(i%2?-1.6:1.6);
+    const p=proj(xc+off,z), u=p.s;
+    miniFan(p.px,p.py,u*0.9,pal[i%pal.length],false);
+    // popper / wavy distraction stick
+    ctx.strokeStyle=["#f0883e","#3fb950","#f85149"][i%3];ctx.lineWidth=Math.max(1,u*0.13);
+    ctx.beginPath();ctx.moveTo(p.px,p.py-u*0.9);ctx.quadraticCurveTo(p.px+u*0.8,p.py-u*1.6,p.px+u*0.4,p.py-u*2.4);ctx.stroke();
+    // big-head cutout
+    if(i%2===0){ctx.fillStyle="#e8e8e8";ctx.fillRect(p.px-u*1.0,p.py-u*2.7,u*0.8,u*0.8);ctx.fillStyle="#6b4a36";ctx.fillRect(p.px-u*0.85,p.py-u*2.55,u*0.5,u*0.5);}
+  }
+}
+function drawCams(){
+  function cam(x){const p=proj(x,2),u=p.s,y=p.py+H*0.03;
+    vox(p.px,y,u*0.9,u*1.6,"#20262e","#12161c");
+    ctx.fillStyle="#3a4450";ctx.fillRect(p.px-u*0.2,y-u*2.4,u*1.2,u*0.7);
+    ctx.fillStyle="#0a0f16";ctx.beginPath();ctx.arc(p.px+u*1.0,y-u*2.05,u*0.3,0,7);ctx.fill();}
+  cam(2); cam(98);
+}
+function drawMeter(){
+  const w=W*0.24,h=H*0.026,x=W*0.5-w/2,y=H*0.86;
+  const a=user.attr,dist=Math.hypot(user.x-HOOP.x,user.z-HOOP.z);
+  const shootAttr=dist>22?a.ThreePT:a.Shooting,green=0.10+0.0035*shootAttr,center=0.82;
+  ctx.fillStyle="#0d1117";ctx.fillRect(x,y,w,h);
+  ctx.fillStyle="rgba(63,185,80,.45)";ctx.fillRect(x+(center-green)*w,y,green*2*w,h);
+  ctx.fillStyle="rgba(63,185,80,.95)";ctx.fillRect(x+(center-green*0.5)*w,y,green*w,h);
+  ctx.fillStyle="#f0883e";ctx.fillRect(x+Math.min(1,charge)*w-2,y-4,4,h+8);
+  ctx.strokeStyle="#2b3340";ctx.strokeRect(x,y,w,h);
+}
+
+/* ===== 5. UI WIRING ===== */
+const slidersEl=document.getElementById("sliders");
+function buildSliders(){
+  slidersEl.innerHTML="";
+  ATTRS.forEach(k=>{
+    const row=document.createElement("div");row.className="row";
+    row.innerHTML=`<label>${k}</label><input type="range" min="0" max="99" value="${user.attr[k]}" data-k="${k}"><span class="val" id="v-${k}">${user.attr[k]}</span>`;
+    slidersEl.appendChild(row);
+    row.querySelector("input").addEventListener("input",ev=>{user.attr[k]=+ev.target.value;document.getElementById("v-"+k).textContent=ev.target.value;});
+  });
+}
+function applyPlayer(p){user.name=p.name;ATTRS.forEach(k=>user.attr[k]=p.attr[k]??70);user.fg=[0,0];user.tp=[0,0];buildSliders();updHud();log(`imported "${p.name}" → normalized 0-99 block applied`,null);}
+function updHud(){document.getElementById("u-name").textContent=user.name;document.getElementById("u-fg").textContent=user.fg[0]+"/"+user.fg[1];document.getElementById("u-3p").textContent=user.tp[0]+"/"+user.tp[1];}
+const logEl=document.getElementById("log");
+function log(msg,cls){const d=document.createElement("div");if(cls)d.className=cls;d.textContent="› "+msg;logEl.prepend(d);}
+document.getElementById("import").onclick=()=>applyPlayer(resolveStatSource(document.getElementById("url").value));
+const presetsEl=document.getElementById("presets");
+["stephen curry","lebron james","nikola jokic","victor wembanyama"].forEach(n=>{const c=document.createElement("span");c.className="chip";c.textContent=n.split(" ").pop();c.onclick=()=>{document.getElementById("url").value=n;applyPlayer(resolveStatSource(n));};presetsEl.appendChild(c);});
+
+let clock=628;
+setInterval(()=>{clock=clock>0?clock-1:719;const m=(clock/60)|0,s=clock%60;document.getElementById("sb-clock").textContent=`${m}:${s<10?'0':''}${s}`;},1000);
+
+// News pop-up — non-persistent, top-left, appears periodically when "news arrives".
+// Production: triggered by the news-feed adapter; here on a timer with mock items.
+const NEWS=[
+  {lbl:"NBA · FINAL", body:'<b>HOME</b> 112 — AWAY 108 &nbsp;<span class="sc">F</span>'},
+  {lbl:"NBA · STAT",  body:'Tatum — 34 PTS · 9 REB · 6 AST'},
+  {lbl:"NBA · LIVE",  body:'LAL @ DEN — Q3 &nbsp;<span class="sc">84-80</span>'},
+  {lbl:"NBA · BREAKING", body:'Wemby posts 5 BLK in road win'},
+  {lbl:"NBA · STANDINGS", body:'HOME clinch 1st in the East (22-7)'},
+  {lbl:"NBA · BUZZ", body:'Trade talks heating up before the deadline'},
+  {lbl:"NBA · INJURY", body:'Starting PG listed day-to-day'}
+];
+let ni=0;
+function popNews(){
+  const el=document.getElementById("newspop"); if(!el) return;
+  const n=NEWS[ni%NEWS.length]; ni++;
+  document.getElementById("np-lbl").textContent=n.lbl;
+  const tk=document.getElementById("np-body");
+  tk.innerHTML=n.body;
+  tk.style.animation="none"; void tk.offsetWidth; tk.style.animation="";  // restart scroll each pop
+  el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"), 9000);   // matches the scroll duration
+}
+setTimeout(popNews, 1500);
+setInterval(popNews, 12000);
+
+/* boot */
+fit(); buildSliders(); applyPlayer(resolveStatSource("stephen curry")); requestAnimationFrame(step);
+</script>
+</body>
+</html>
