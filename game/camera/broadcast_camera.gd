@@ -20,7 +20,7 @@ class_name BroadcastCamera
 ## Easing factor for horizontal follow (higher = snappier).
 @export var follow_lag: float = 2.5
 ## Clamp horizontal travel so the rig never overshoots the baselines.
-@export var max_pan_x: float = 9.0
+@export var max_pan_x: float = 5.0
 
 var _target: Node3D = null
 var _current_x: float = 0.0
