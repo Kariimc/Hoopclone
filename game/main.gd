@@ -17,6 +17,14 @@ func _ready() -> void:
 	else:
 		print("No roster JSON yet — run tools/data/export_roster.py first.")
 
+	# Wire the broadcast camera to follow the player. Until the real ball lands
+	# in Sprint 5, the player is the focus node; set_target() tracks its X with
+	# easing lag and clamps to max_pan_x so the rig never overshoots a baseline.
+	var cam := $BroadcastCamera as BroadcastCamera
+	var player := $Player as Player
+	if cam != null and player != null:
+		cam.set_target(player)
+
 func _load_roster(path: String) -> Array:
 	if not FileAccess.file_exists(path):
 		return []
