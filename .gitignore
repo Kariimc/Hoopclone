@@ -12,3 +12,10 @@ venv/
 
 # Generated rosters (regenerate via export_roster.py); keep a sample if useful
 # data/rosters/*.json
+
+# Binary assets — placed by hand per docs/ASSET_INDEX.md; only their origins are
+# tracked (assets/manifest.json / assets/team_manifest.json), not the binaries.
+assets/models/*.glb
+assets/textures/*.png
+assets/textures/*.jpeg
+assets/env/*.png
