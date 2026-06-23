@@ -1,69 +1,79 @@
-extends Node3D
+@tool
+extends SkeletonModifier3D
 class_name VerletHair
-## Verlet hair / dread physics — a self-contained bone-chain solver, decoupled
-## from the animation state machine so it keeps swinging regardless of what the
-## player is doing. Attach under a Skeleton3D, point it at a chain of bone
-## indices (root -> tip), and it integrates each segment with gravity, a
-## stiffness constraint, and capsule (head/shoulder) collision.
+## Verlet hair / dread physics — Sprint 4 write-back version.
 ##
-## Per-archetype tunables let a tight fade barely move while long dreads swing
-## freely. ~Verlet integration: x' = x + (x - x_prev) * damping + accel * dt^2,
-## then distance-constraint each segment to preserve strand length.
+## Sprint 1 shipped the solver as a plain Node3D with a stubbed write-back. This
+## supersedes it as a Godot 4 SkeletonModifier3D: it runs inside the skeleton's
+## modification phase (after the AnimationTree poses the skeleton), solves the
+## strand with Verlet integration, then rotates each chain bone to follow the
+## solved points. Because it's a modifier it stays decoupled from the animation
+## state machine — the hair swings no matter what the body is doing.
+##
+## Attach as a child of the Skeleton3D. Set `bone_chain` to the strand's bone
+## indices (root -> tip). `bone_forward_axis` MUST match how the rig's bones
+## point (most Mixamo/Meshy rigs run bones down +Y); flip it if the hair kinks.
 
-## Skeleton this hair is parented to. If null, uses the parent if it is one.
-@export var skeleton_path: NodePath
-## Bone indices forming the strand, root first.
+## Strand bone indices, root first.
 @export var bone_chain: Array[int] = []
+## Which local axis the bones point down (rig-dependent — tune in-editor).
+@export var bone_forward_axis: Vector3 = Vector3.UP
 ## Rest length between consecutive bones (metres).
 @export var segment_length: float = 0.06
-## Gravity applied to each free point.
+## Gravity on each free point.
 @export var gravity: Vector3 = Vector3(0, -9.8, 0)
-## 0..1 velocity retention per step (lower = stiffer/more damped).
-@export var damping: float = 0.92
+## 0..1 velocity retention per step (lower = stiffer / more damped).
+@export_range(0.0, 1.0) var damping: float = 0.92
 ## Constraint solver iterations (more = stiffer, costlier).
 @export var iterations: int = 6
-## Collision capsule radius around the head/neck so strands don't clip.
+## Capsule radius around the head/neck so strands don't clip inward.
 @export var collide_radius: float = 0.11
 
-var _skel: Skeleton3D
 var _points: PackedVector3Array = PackedVector3Array()
 var _prev: PackedVector3Array = PackedVector3Array()
-var _ready_ok: bool = false
+var _initialised: bool = false
 
-func _ready() -> void:
-	_skel = get_node_or_null(skeleton_path) as Skeleton3D
-	if _skel == null:
-		_skel = get_parent() as Skeleton3D
-	if _skel == null or bone_chain.is_empty():
-		push_warning("VerletHair: missing skeleton or empty bone_chain; disabled.")
+func _process_modification() -> void:
+	var skel := get_skeleton()
+	if skel == null or bone_chain.size() < 2:
 		return
-	for idx in bone_chain.size():
-		var p := _bone_global_pos(bone_chain[idx])
-		_points.append(p)
-		_prev.append(p)
-	_ready_ok = true
+	if Engine.is_editor_hint():
+		return  # don't simulate in the editor viewport
 
-func _physics_process(delta: float) -> void:
-	if not _ready_ok:
-		return
-	# Root point is pinned to the actual bone (driven by animation).
-	var root_pos := _bone_global_pos(bone_chain[0])
-	_points[0] = root_pos
-	_prev[0] = root_pos
+	var delta := get_physics_process_delta_time()
+	if delta <= 0.0:
+		delta = 1.0 / 60.0
 
-	# Verlet integrate the free points.
+	if not _initialised:
+		_seed_points(skel)
+
+	# Root is pinned to the animated bone.
+	var root := _bone_world(skel, bone_chain[0])
+	_points[0] = root
+	_prev[0] = root
+
+	# Verlet integrate the free points (world space).
 	for i in range(1, _points.size()):
 		var cur := _points[i]
 		var vel := (cur - _prev[i]) * damping
 		_prev[i] = cur
 		_points[i] = cur + vel + gravity * delta * delta
 
-	_solve_constraints(root_pos)
-	_write_back_to_bones()
+	_solve(root)
+	_write_back(skel)
 
-func _solve_constraints(root_pos: Vector3) -> void:
+func _seed_points(skel: Skeleton3D) -> void:
+	_points.clear()
+	_prev.clear()
+	for idx in bone_chain:
+		var p := _bone_world(skel, idx)
+		_points.append(p)
+		_prev.append(p)
+	_initialised = true
+
+func _solve(root: Vector3) -> void:
 	for _it in iterations:
-		_points[0] = root_pos
+		_points[0] = root
 		for i in range(1, _points.size()):
 			var a := _points[i - 1]
 			var b := _points[i]
@@ -71,29 +81,34 @@ func _solve_constraints(root_pos: Vector3) -> void:
 			var dist := dir.length()
 			if dist > 0.0001:
 				var diff := (dist - segment_length) / dist
-				# Root side is heavier (pinned), so move the tip side more.
 				_points[i] = b - dir * diff
-			# Keep strands outside the head/neck capsule.
-			var to_pt := _points[i] - root_pos
-			if to_pt.length() < collide_radius:
-				_points[i] = root_pos + to_pt.normalized() * collide_radius
+			# keep strands outside the head/neck capsule
+			var off := _points[i] - root
+			if off.length() < collide_radius:
+				_points[i] = root + off.normalized() * collide_radius
 
-func _write_back_to_bones() -> void:
-	# Orient each bone to look at the next solved point. Sprint 4 refines this
-	# into proper local-pose rotations against the bind pose; for now we expose
-	# the solved world points for the rig to consume.
-	for i in range(0, bone_chain.size() - 1):
-		var from := _points[i]
-		var to := _points[i + 1]
-		var dir := (to - from)
-		if dir.length() < 0.0001:
+## Rotate each chain bone so its forward axis points at the next solved point.
+func _write_back(skel: Skeleton3D) -> void:
+	var skel_inv := skel.global_transform.affine_inverse()
+	for i in range(bone_chain.size() - 1):
+		var idx := bone_chain[i]
+		var dir_world := _points[i + 1] - _points[i]
+		if dir_world.length() < 0.0001:
 			continue
-		# Placeholder hook: a bone-pose writer lands with the rigged mesh.
-		pass
+		var dir_skel := (skel_inv.basis * dir_world).normalized()
 
-func solved_points() -> PackedVector3Array:
-	return _points
+		var gpose := skel.get_bone_global_pose(idx)
+		var cur_forward := (gpose.basis * bone_forward_axis).normalized()
 
-func _bone_global_pos(bone_idx: int) -> Vector3:
-	var local := _skel.get_bone_global_pose(bone_idx).origin
-	return _skel.global_transform * local
+		var swing := Quaternion(cur_forward, dir_skel)
+		var new_basis := Basis(swing) * gpose.basis
+
+		var parent := skel.get_bone_parent(idx)
+		var parent_basis := (
+			skel.get_bone_global_pose(parent).basis if parent >= 0 else Basis()
+		)
+		var local_basis := parent_basis.inverse() * new_basis
+		skel.set_bone_pose_rotation(idx, local_basis.get_rotation_quaternion())
+
+func _bone_world(skel: Skeleton3D, idx: int) -> Vector3:
+	return skel.global_transform * skel.get_bone_global_pose(idx).origin

@@ -1,0 +1,30 @@
+{
+  "_comment": "Apparel hot-swap manifest. Export the base mesh + textures from Higgsfield once into res://assets/, then point these paths at the local files. The Higgsfield job IDs each asset came from are noted for re-export/regeneration.",
+  "base_mesh": "res://assets/models/player_base.glb",
+  "_base_mesh_origin": "Higgsfield 3D job 65167a5f (rigged + PBR, from locked player 256aea43)",
+  "teams": {
+    "CRW": {
+      "name": "Crimson Wolves",
+      "primary": "#7a0019",
+      "secondary": "#0b0e13",
+      "jersey_albedo": "res://assets/textures/crw_jersey_albedo.png",
+      "jersey_normal": "res://assets/textures/crw_jersey_normal.png",
+      "logo": "res://assets/textures/crw_logo.png",
+      "_logo_origin": "Higgsfield e3bd0346 (crimson wolf)"
+    },
+    "STM": {
+      "name": "Storm",
+      "primary": "#1f6feb",
+      "secondary": "#0b0e13",
+      "jersey_albedo": "res://assets/textures/stm_jersey_albedo.png",
+      "jersey_normal": "res://assets/textures/stm_jersey_normal.png"
+    },
+    "BAY": {
+      "name": "Bayside",
+      "primary": "#00a884",
+      "secondary": "#0b0e13",
+      "jersey_albedo": "res://assets/textures/bay_jersey_albedo.png",
+      "jersey_normal": "res://assets/textures/bay_jersey_normal.png"
+    }
+  }
+}

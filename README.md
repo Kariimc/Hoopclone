@@ -103,7 +103,7 @@ player) land in the asset-pipeline sprint; Sprint 1 ships logic + anchors.
 - [x] **Sprint 1** — engine spine: camera, player/anim/hair, attribute model, Python data pipeline (this repo)
 - [x] **Sprint 2** — shot + ball physics (green-zone meter, rim/backboard, shot model)
 - [x] **Sprint 3** — data engine hardening (percentile pools, full league import, live-feed polish)
-- [ ] **Sprint 4** — asset pipeline + AnimationTree blend trees + rigged hair write-back
+- [x] **Sprint 4** — asset pipeline + AnimationTree blend trees + rigged hair write-back
 - [ ] **Sprint 5** — box-score simulator (sim/spectate/play)
 - [ ] **Sprint 6** — Season / Franchise
 - [ ] **Sprint 7** — Commissioner + CEO/ownership layer
