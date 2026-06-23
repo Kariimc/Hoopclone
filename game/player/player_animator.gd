@@ -39,7 +39,7 @@ func update_locomotion_blend(speed: float) -> void:
 func _on_state_changed(_from: int, to: int) -> void:
 	if _playback == null or _tree == null:
 		return
-	var state_name := AnimStateMachine.State.keys()[to]
+	var state_name: String = AnimStateMachine.State.keys()[to]
 	# Locomotion states all live inside the "Locomotion" blend node.
 	if to in [
 		AnimStateMachine.State.IDLE, AnimStateMachine.State.WALK,
