@@ -1,0 +1,14 @@
+{
+  "season": "2025-26",
+  "teams": [
+    {"name": "Crimson Wolves", "abbr": "CRW",
+     "players": ["Alpha Guard", "Bravo Wing", "Charlie Big", "Delta Slash", "Echo Anchor",
+                 "Foxtrot Spark", "Golf Glue", "Hotel Rim"]},
+    {"name": "Storm", "abbr": "STM",
+     "players": ["India Flash", "Juliet Range", "Kilo Post", "Lima Lock", "Mike Motor",
+                 "November Sky", "Oscar Bounce", "Papa Wall"]},
+    {"name": "Bayside", "abbr": "BAY",
+     "players": ["Quebec Quick", "Romeo Reach", "Sierra Stretch", "Tango Tower", "Uniform Up",
+                 "Victor Vault", "Whiskey Wire", "Xray Edge"]}
+  ]
+}

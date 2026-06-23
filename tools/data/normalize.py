@@ -122,3 +122,87 @@ def normalize(raw: RawStatLine) -> AttributeBlock:
             setattr(blk, attr, clamp(float(value)))
 
     return blk
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3: percentile-pool normalisation
+# ---------------------------------------------------------------------------
+# Rate observable attributes by where a player falls within the *league*
+# distribution instead of fixed absolute anchors. Position-relative cohorts are
+# used for size-dependent skills (rebounding, interior D, hops, finishing) so a
+# 7-footer isn't graded on the rebounding curve of guards. Percentile is blended
+# with the absolute scale so a weak league can't inflate everyone to elite.
+
+def _g(v: Optional[float]) -> float:
+    return v if v is not None else 0.0
+
+
+# One ordering metric per pool-rated attribute (percentile only needs ordering).
+_METRIC = {
+    "shooting": lambda r: 0.65 * _g(r.fg_pct) + 0.35 * _g(r.ft_pct),
+    "three_pt": lambda r: _g(r.fg3_pct) * (0.4 + 0.6 * min(1.0, _g(r.fg3a) / 8.0)),
+    "finishing": lambda r: (
+        r.rim_fg_pct if r.rim_fg_pct is not None
+        else 0.6 * _g(r.fg_pct) + 0.4 * _g(r.ft_rate)
+    ),
+    "passing": lambda r: _g(r.ast),
+    "handles": lambda r: 0.6 * _g(r.ast) + 0.4 * _g(r.ast_to),
+    "steals": lambda r: _g(r.stl),
+    "hustle": lambda r: _g(r.stl) + 10.0 * _g(r.oreb_pct),
+    "rebounding": lambda r: _g(r.reb),
+    "perim_d": lambda r: _g(r.stl),
+    "inside_d": lambda r: _g(r.blk),
+    "hops": lambda r: _g(r.blk),
+}
+
+# Attributes graded against position-cohort pools rather than the whole league.
+POOL_RELATIVE = {"rebounding", "inside_d", "hops", "finishing"}
+
+# Weight on the percentile signal vs the absolute-scale value from normalize().
+PCT_BLEND = 0.7
+MIN_COHORT = 5
+
+
+def build_metric_pools(lines: list) -> dict:
+    """{attr: {"ALL": [...], "PG": [...], ...}} of ordering metrics."""
+    pools: dict = {a: {"ALL": []} for a in _METRIC}
+    for ln in lines:
+        for a in _METRIC:
+            val = _METRIC[a](ln)
+            pools[a]["ALL"].append(val)
+            pools[a].setdefault(ln.position, []).append(val)
+    return pools
+
+
+def _cohort(pools: dict, attr: str, position: str, position_relative: bool) -> list:
+    if position_relative and attr in POOL_RELATIVE:
+        pos_pool = pools[attr].get(position, [])
+        if len(pos_pool) >= MIN_COHORT:
+            return pos_pool
+    return pools[attr]["ALL"]
+
+
+def normalize_pool(lines: list, position_relative: bool = True) -> list:
+    """Normalise a whole pool together so attributes are league-relative.
+
+    Returns AttributeBlocks aligned with ``lines``. Baseline-led attributes
+    (speed, dunking) come from the absolute path; observable attributes are the
+    percentile/absolute blend; manual overrides win last.
+    """
+    pools = build_metric_pools(lines)
+    out: list = []
+    for ln in lines:
+        absolute = normalize(ln)
+        blk = AttributeBlock()
+        for a in ATTRIBUTES:
+            setattr(blk, a, getattr(absolute, a))
+        for a in _METRIC:
+            cohort = _cohort(pools, a, ln.position, position_relative)
+            pct = percentile_rank(_METRIC[a](ln), cohort)
+            blended = PCT_BLEND * pct + (1.0 - PCT_BLEND) * getattr(absolute, a)
+            setattr(blk, a, clamp(blended))
+        for attr, value in ln.overrides.items():  # overrides win last
+            if attr in ATTRIBUTES:
+                setattr(blk, attr, clamp(float(value)))
+        out.append(blk)
+    return out
