@@ -7,6 +7,10 @@ class_name Player
 @export var base_speed: float = 4.0
 @export var speed_per_point: float = 0.045
 @export var accel: float = 28.0
+## Court bounds (metres from centre). Keeps the player on the visible floor
+## so the sideline-panning camera never loses him off an edge of the frame.
+@export var court_half_x: float = 11.0
+@export var court_half_z: float = 7.0
 
 var attributes: Attributes
 var anim: AnimStateMachine
@@ -48,4 +52,6 @@ func _physics_process(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, move.x, accel * delta)
 	velocity.z = move_toward(velocity.z, move.z, accel * delta)
 	move_and_slide()
+	global_position.x = clampf(global_position.x, -court_half_x, court_half_x)
+	global_position.z = clampf(global_position.z, -court_half_z, court_half_z)
 	anim.update_locomotion(Vector2(velocity.x, velocity.z).length())
