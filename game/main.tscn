@@ -90,8 +90,3 @@ surface_material_override/0 = SubResource("StandardMaterial3D_261k7")
 transform = Transform3D(1, 0, 0, 0, 0.978148, -0.207912, 0, 0.207912, 0.978148, 0, 4, -14)
 mesh = SubResource("QuadMesh_3uuxw")
 surface_material_override/0 = SubResource("StandardMaterial3D_ll8x2")
-
-[node name="Stands_Left" type="MeshInstance3D" parent="."]
-transform = Transform3D(-4.37114e-08, -0.207912, -0.978148, 0, 0.978148, -0.207912, 1, -9.08811e-09, -4.27562e-08, 15, 6, 0)
-mesh = SubResource("QuadMesh_3uuxw")
-surface_material_override/0 = SubResource("StandardMaterial3D_ll8x2")

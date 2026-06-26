@@ -40,8 +40,8 @@ func _build_side_stands() -> void:
 		return
 	# Left stand sits just outside the -X baseline, facing in (+X). Right stand
 	# mirrors it. Walls are upright (no rake) so there is no Euler ambiguity.
-	_spawn_stand("Stands_Left", Vector3(-15.0, 6.0, -2.0), 90.0, mat)
-	_spawn_stand("Stands_Right", Vector3(15.0, 6.0, -2.0), -90.0, mat)
+	_spawn_stand("Stands_Left", Vector3(-19.0, 8.0, -2.0), 90.0, mat)
+	_spawn_stand("Stands_Right", Vector3(19.0, 8.0, -2.0), -90.0, mat)
 
 func _spawn_stand(stand_name: String, pos: Vector3, yaw_deg: float, src_mat: Material) -> void:
 	var wall := MeshInstance3D.new()
