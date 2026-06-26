@@ -1,16 +1,17 @@
-[gd_scene load_steps=10 format=3 uid="uid://dxa0cvk3gyv5d"]
+[gd_scene load_steps=16 format=3 uid="uid://dxa0cvk3gyv5d"]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
-[ext_resource type="Texture2D" uid="uid://b2e37h7ilrkiq" path="res://assets/textures/court_floor.png.jpeg" id="3_77ka3"]
 [ext_resource type="PackedScene" uid="uid://bjdfcbjufl34w" path="res://assets/models/player_base.glb" id="3_exa1i"]
+[ext_resource type="Texture2D" uid="uid://boeoxksph8jl3" path="res://assets/textures/court_floor.jpeg" id="3_nb6fj"]
 [ext_resource type="Script" path="res://game/player/player.gd" id="4_pqlpv"]
+[ext_resource type="Texture2D" uid="uid://lm1fccmov4ah" path="res://assets/textures/crowd_far.png" id="6_odol7"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4qycw"]
-albedo_texture = ExtResource("3_77ka3")
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d6fye"]
+albedo_texture = ExtResource("3_nb6fj")
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_1lkmb"]
-material = SubResource("StandardMaterial3D_4qycw")
+material = SubResource("StandardMaterial3D_d6fye")
 size = Vector2(28, 15)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_hylkq"]
@@ -21,6 +22,24 @@ height = 0.02
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3fo0c"]
 albedo_color = Color(1, 0.392157, 0, 1)
 
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_5rctg"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_7xrh2"]
+size = Vector2(50, 35)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_261k7"]
+albedo_color = Color(0.164706, 0.145098, 0.133333, 1)
+uv1_scale = Vector3(3, 1, 6)
+
+[sub_resource type="QuadMesh" id="QuadMesh_3uuxw"]
+size = Vector2(30, 16)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ll8x2"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("6_odol7")
+uv1_scale = Vector3(2.1, 2.5, 6)
+
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
@@ -28,6 +47,9 @@ script = ExtResource("1_main")
 transform = Transform3D(1, 0, 0, 0, 0.927, 0.374, 0, -0.374, 0.927, 0, 7, 14)
 fov = 40.0
 script = ExtResource("2_cam")
+rig_distance = 18.0
+broadcast_fov = 32.0
+max_pan_x = 10.0
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.86, -0.35, 0.37, 0, 0.72, 0.69, -0.5, -0.6, 0.62, 0, 12, 0)
@@ -39,17 +61,37 @@ shadow_enabled = true
 mesh = SubResource("PlaneMesh_1lkmb")
 
 [node name="LeftHoop" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 3.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.7, 3.05, 0)
 mesh = SubResource("CylinderMesh_hylkq")
 surface_material_override/0 = SubResource("StandardMaterial3D_3fo0c")
 
 [node name="RightHoop" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 3.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.7, 3.05, 0)
 mesh = SubResource("CylinderMesh_hylkq")
 surface_material_override/0 = SubResource("StandardMaterial3D_3fo0c")
 
 [node name="Player" type="CharacterBody3D" parent="."]
 script = ExtResource("4_pqlpv")
+court_half_x = 13.5
+court_half_z = 7.2
 
 [node name="player_base" parent="Player" instance=ExtResource("3_exa1i")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.01, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("CapsuleShape3D_5rctg")
+
+[node name="ArenaFloor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("PlaneMesh_7xrh2")
+surface_material_override/0 = SubResource("StandardMaterial3D_261k7")
+
+[node name="Stands_Far" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.978148, -0.207912, 0, 0.207912, 0.978148, 0, 4, -14)
+mesh = SubResource("QuadMesh_3uuxw")
+surface_material_override/0 = SubResource("StandardMaterial3D_ll8x2")
+
+[node name="Stands_Left" type="MeshInstance3D" parent="."]
+transform = Transform3D(-4.37114e-08, -0.207912, -0.978148, 0, 0.978148, -0.207912, 1, -9.08811e-09, -4.27562e-08, 15, 6, 0)
+mesh = SubResource("QuadMesh_3uuxw")
+surface_material_override/0 = SubResource("StandardMaterial3D_ll8x2")
