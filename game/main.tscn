@@ -1,11 +1,11 @@
-[gd_scene load_steps=16 format=3 uid="uid://dxa0cvk3gyv5d"]
+[gd_scene load_steps=17 format=3 uid="uid://dxa0cvk3gyv5d"]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
 [ext_resource type="PackedScene" uid="uid://bjdfcbjufl34w" path="res://assets/models/player_base.glb" id="3_exa1i"]
 [ext_resource type="Texture2D" uid="uid://boeoxksph8jl3" path="res://assets/textures/court_floor.jpeg" id="3_nb6fj"]
 [ext_resource type="Script" path="res://game/player/player.gd" id="4_pqlpv"]
-[ext_resource type="Texture2D" uid="uid://lm1fccmov4ah" path="res://assets/textures/crowd_far.png" id="6_odol7"]
+[ext_resource type="Texture2D" uid="uid://ccxwsosmpksaq" path="res://game/crowd_panorama_dense.png" id="6_0o3mu"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d6fye"]
 albedo_texture = ExtResource("3_nb6fj")
@@ -37,8 +37,15 @@ size = Vector2(30, 16)
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ll8x2"]
 cull_mode = 2
 shading_mode = 0
-albedo_texture = ExtResource("6_odol7")
+albedo_texture = ExtResource("6_0o3mu")
 uv1_scale = Vector3(2.1, 2.5, 6)
+
+[sub_resource type="Environment" id="Environment_q5p3e"]
+background_mode = 1
+background_color = Color(0.0392157, 0.0392157, 0.0784314, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.352941, 0.372549, 0.419608, 1)
+ambient_light_energy = 0.6
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -53,7 +60,6 @@ max_pan_x = 10.0
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.86, -0.35, 0.37, 0, 0.72, 0.69, -0.5, -0.6, 0.62, 0, 12, 0)
-shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="."]
 
@@ -90,3 +96,6 @@ surface_material_override/0 = SubResource("StandardMaterial3D_261k7")
 transform = Transform3D(1, 0, 0, 0, 0.978148, -0.207912, 0, 0.207912, 0.978148, 0, 4, -14)
 mesh = SubResource("QuadMesh_3uuxw")
 surface_material_override/0 = SubResource("StandardMaterial3D_ll8x2")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_q5p3e")
