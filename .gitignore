@@ -1,7 +1,11 @@
 # Godot
 .godot/
-*.import
 export_presets.cfg
+# Only ignore Godot import sidecars under assets/, whose binaries are hand-placed
+# and not tracked (see below). Import files for COMMITTED assets — anything under
+# game/ or the repo root — must travel with the repo, or their textures/models
+# break on a fresh clone.
+assets/**/*.import
 
 # Python
 __pycache__/
