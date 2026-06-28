@@ -24,4 +24,5 @@ state (leader, margin, late-game) and mixed with a rotating pool.
 
 ## Tests
 `tools/data`: 13 pytest (absolute + pool: range, monotonicity, position-relative
-rebounding, overrides). `tools/sim`: 9 pytest (shot curve).
+rebounding, overrides). `tools/sim`: 22 pytest (9 shot curve + 11 contest model +
+2 cross-language constant parity).

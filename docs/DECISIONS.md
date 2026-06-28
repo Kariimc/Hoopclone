@@ -54,6 +54,23 @@ Rebounding, PerimD, InsideD, Speed — each 0–99.
 - Both are live-data driven (Python `live_service`); Higgsfield images are
   design references only.
 
+## Defenders & contest (Sprint 5)
+
+- **Contest = a 0-1 scalar**, not a per-defender hit list. It's the product of
+  three bounded factors — defender **proximity** (gate; zero past 3.5 m), **shot-
+  lane angle** (between shooter and basket contests most), and **defensive
+  rating** (PerimD on jumpers/threes, InsideD inside) — mirrored Python↔GDScript.
+  pytest locks the curve's shape and parity-checks the GDScript constants against
+  the Python module (`test_gdscript_parity.py`); the formula stays in lockstep by
+  hand. See `docs/CONTEST_MODEL.md`.
+- **Strongest defender wins**, no double-team stacking yet — keeps the curve
+  honest and the math trivial to verify before we add help defense.
+- **On-ball D is deliberately beatable:** the defender's slide speed sits a touch
+  under a typical attacker, so a quick first step creates separation. Defense
+  lowers your percentage; it doesn't make scoring impossible.
+- **Floor-plane geometry:** contest is computed in XZ. The shot arcs up, but
+  "is the defender between me and the rim" is a 2D question.
+
 ## Scope marker
 
 CEO / ownership-economic layer (arena, tickets, sponsorships, staff) is the one

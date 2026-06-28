@@ -15,6 +15,8 @@ signal shot_taken(made: bool, probability: float, is_three: bool)
 var shooter: Player
 var ball: Ball
 var rim: Node3D
+## On-ball defenders that can contest this shot (Sprint 5). Empty = uncontested.
+var defenders: Array[Defender] = []
 
 var _charging: bool = false
 var _meter: float = 0.0
@@ -24,6 +26,10 @@ func setup(p_shooter: Player, p_ball: Ball, p_rim: Node3D) -> void:
 	shooter = p_shooter
 	ball = p_ball
 	rim = p_rim
+
+## Register the defenders whose positioning pressures this shot.
+func set_defenders(p_defenders: Array[Defender]) -> void:
+	defenders = p_defenders
 
 func is_charging() -> bool:
 	return _charging
@@ -63,8 +69,8 @@ func release() -> void:
 		"three_pt" if is_three else "shooting"
 	)
 	var t_err: float = ShotModel.timing_error(_meter - perfect_mark, rating)
-	# Contest is wired in once defenders exist (Sprint 5); 0 for now.
-	var prob: float = ShotModel.make_probability(distance, rating, 0.0, t_err)
+	var contest: float = _contest_at(shooter_pos, rim_pos, is_three)
+	var prob: float = ShotModel.make_probability(distance, rating, contest, t_err)
 	var made: bool = randf() < prob
 
 	var target: Vector3 = rim_pos
@@ -78,3 +84,21 @@ func release() -> void:
 	var arc: float = clampf(1.8 + distance * 0.12, 1.8, 3.6)
 	ball.launch(shooter_pos + Vector3(0, 2.0, 0), target, made, arc, flight)
 	shot_taken.emit(made, prob, is_three)
+
+## Strongest contest from the registered defenders, in [0, 1]. Works in the
+## horizontal plane and asks each defender for the rating that matters for this
+## shot type (PerimD on threes, InsideD inside). Stale/freed defenders are skipped.
+func _contest_at(shooter_pos: Vector3, rim_pos: Vector3, is_three: bool) -> float:
+	if defenders.is_empty():
+		return 0.0
+	var shooter_xz := Vector2(shooter_pos.x, shooter_pos.z)
+	var basket_xz := Vector2(rim_pos.x, rim_pos.z)
+	var marks: Array = []
+	for d in defenders:
+		if d == null or not is_instance_valid(d):
+			continue
+		marks.append({
+			"pos": Vector2(d.global_position.x, d.global_position.z),
+			"rating": d.defensive_rating(is_three),
+		})
+	return ContestModel.contest_from_defenders(shooter_xz, basket_xz, marks)
