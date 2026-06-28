@@ -13,7 +13,11 @@ extends Node3D
 # when absent we fall back to a placeholder body + plain floor colour so the
 # project always opens and runs. Drop the real files in and they light up — no
 # code change needed.
-const COURT_FLOOR_TEX := "res://assets/textures/court_floor.jpeg"
+const COURT_FLOOR_CANDIDATES := [
+	"res://assets/textures/court_floor.jpeg",
+	"res://assets/textures/court_floor.png",
+	"res://assets/textures/court_floor.jpg",
+]
 const PLAYER_MESH_GLB := "res://assets/models/player_base.glb"
 
 # --- Dark underfloor (one big plane under everything; seamless by overshoot) ---
@@ -110,10 +114,15 @@ func _ready() -> void:
 	_build_courtside()
 
 func _apply_court_floor() -> void:
-	# Drop the hardwood photo onto the court plane if it's been placed; otherwise
-	# the scene's wood-brown fallback colour stands in.
-	if not ResourceLoader.exists(COURT_FLOOR_TEX):
-		print("Court floor texture not found (%s) — using fallback colour." % COURT_FLOOR_TEX)
+	# Drop the hardwood photo onto the court plane if it's been placed (any of the
+	# accepted extensions); otherwise the scene's wood-brown fallback stands in.
+	var path := ""
+	for candidate in COURT_FLOOR_CANDIDATES:
+		if ResourceLoader.exists(candidate):
+			path = candidate
+			break
+	if path.is_empty():
+		print("Court floor texture not found — using fallback colour.")
 		return
 	var mesh_node := get_node_or_null("Floor/FloorMesh") as MeshInstance3D
 	if mesh_node == null:
@@ -122,10 +131,10 @@ func _apply_court_floor() -> void:
 	var mat := (prim.material if prim != null else null) as StandardMaterial3D
 	if mat == null:
 		return
-	var tex := load(COURT_FLOOR_TEX) as Texture2D
+	var tex := load(path) as Texture2D
 	if tex != null:
 		mat.albedo_texture = tex
-		print("Court floor texture applied from %s" % COURT_FLOOR_TEX)
+		print("Court floor texture applied from %s" % path)
 
 func _ensure_player_body(player: Node3D) -> void:
 	# Instance the rigged GLB if it's been placed; otherwise spawn a capsule
