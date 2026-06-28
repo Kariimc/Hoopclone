@@ -6,6 +6,8 @@ extends Node3D
 ## Dark underfloor keeps court-to-stands gaps reading as floor, not void.
 
 @export var roster_json: String = "res://data/rosters/crimson.json"
+## Team kit the boot player wears (key in assets/team_manifest.json: CRW/STM/BAY).
+@export var player_team: String = "CRW"
 
 # --- Optional hand-placed binaries (gitignored; see docs/ASSET_INDEX.md) ---
 # The rigged player GLB and the hardwood floor photo don't travel with the repo,
@@ -142,13 +144,16 @@ func _ensure_player_body(player: Node3D) -> void:
 	if player == null:
 		return
 	if ResourceLoader.exists(PLAYER_MESH_GLB):
-		var packed := load(PLAYER_MESH_GLB) as PackedScene
-		if packed != null:
-			var inst := packed.instantiate()
-			inst.name = "player_base"
-			player.add_child(inst)
-			print("Player mesh instanced from %s" % PLAYER_MESH_GLB)
-			return
+		# Dress the mesh in the team kit via the apparel pipeline (texture swap on
+		# the fixed base mesh — the locked art-direction rule). Jersey textures
+		# that aren't placed yet are simply skipped, so the bare mesh still shows.
+		var loader := AssetLoader.new()
+		add_child(loader)
+		var inst := loader.spawn_player(player_team)
+		inst.name = "player_base"
+		player.add_child(inst)
+		print("Player mesh instanced + dressed (%s) from %s" % [player_team, PLAYER_MESH_GLB])
+		return
 	print("Player mesh not found (%s) — using capsule placeholder." % PLAYER_MESH_GLB)
 	var ph := MeshInstance3D.new()
 	ph.name = "PlaceholderBody"
