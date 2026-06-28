@@ -10,17 +10,29 @@ Everything the project needs — code *and* art (the player mesh, court, jerseys
 crowd) — now lives **inside** the repo. There are no more hand-placed files.
 So a fresh, up-to-date copy is always a complete, working project.
 
-## The only two actions you ever take
+## The actions you ever take
 
-In the top folder of the project there are two scripts. You double-click them — no typing.
+In the top folder of the project there are scripts. You double-click them — no typing.
 
 | When | Double-click | What it does |
 |------|--------------|--------------|
 | **Before** you start working | `GET-LATEST.bat` | Pulls the newest version from GitHub so you're not on a stale copy. |
+| **To test the game** | `PLAY.bat` | Pulls the latest, then launches the game in Godot so you can play the current build. |
 | **After** you finish working | `SAVE-WORK.bat` | Uploads everything you changed to GitHub so the other machine can get it. |
 
-That's the whole workflow: **Get-Latest → work → Save-Work.** Do that on every
-machine and the cloud and the laptop stay identical.
+That's the whole workflow: **Get-Latest → work → Save-Work**, and **Play** any
+time you want to see the latest build. Do that on every machine and the cloud
+and the laptop stay identical.
+
+### One-time PLAY setup
+
+`PLAY.bat` needs to know where Godot is. It checks, in order: a `godot-path.txt`
+file you create, your PATH, next to the script, and the common install folders —
+so most of the time it just works. If it can't find Godot, it tells you exactly
+what to do: install Godot 4, then make a file next to `PLAY.bat` called
+`godot-path.txt` with the full path to your Godot `.exe` on the first line (e.g.
+`C:\Godot\Godot_v4.3-stable_win64.exe`). That file is per-machine and isn't
+synced. **Controls:** move with WASD / arrows, hold **Space** to shoot.
 
 ## One-time cleanup (the cause of the trouble)
 
