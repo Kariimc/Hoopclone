@@ -12,7 +12,7 @@ So a fresh, up-to-date copy is always a complete, working project.
 
 ## The only two actions you ever take
 
-In `tools/sync/` there are two scripts. You double-click them — no typing.
+In the top folder of the project there are two scripts. You double-click them — no typing.
 
 | When | Double-click | What it does |
 |------|--------------|--------------|
