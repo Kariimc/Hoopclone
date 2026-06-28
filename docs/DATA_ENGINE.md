@@ -26,3 +26,9 @@ state (leader, margin, late-game) and mixed with a rotating pool.
 `tools/data`: 13 pytest (absolute + pool: range, monotonicity, position-relative
 rebounding, overrides). `tools/sim`: 22 pytest (9 shot curve + 11 contest model +
 2 cross-language constant parity).
+
+CI also runs a **Godot engine self-test** (`tests/godot/run_tests.gd`) — the real
+GDScript `ShotModel` + `ContestModel` headless under Godot, asserting behaviour
+(e.g. a contested shot's make% is lower than an open one) and failing the build
+on any bad assertion. So the engine side is verified automatically, not just the
+Python mirror. Two CI jobs: `python-tests`, `godot-tests`.
