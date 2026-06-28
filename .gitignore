@@ -4,6 +4,8 @@ export_presets.cfg
 
 # Per-machine path to your Godot .exe for PLAY.bat (varies by computer).
 godot-path.txt
+# Godot engine that PLAY.bat downloads itself if none is installed (per-machine).
+.godot-bin/
 
 # Python
 __pycache__/

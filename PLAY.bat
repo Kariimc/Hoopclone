@@ -61,6 +61,20 @@ if not defined GODOT (
   )
 )
 
+REM (e) Still nothing? Download Godot ourselves, once, into a gitignored folder.
+REM     (Matches the project's Godot 4.3; ~60 MB the first time, then reused.)
+set "GODOT_BIN=%~dp0.godot-bin\Godot_v4.3-stable_win64.exe"
+if not defined GODOT if exist "%GODOT_BIN%" set "GODOT=%GODOT_BIN%"
+if not defined GODOT (
+  echo Godot isn't installed here - downloading it once ^(~60 MB^), please wait...
+  if not exist "%~dp0.godot-bin" mkdir "%~dp0.godot-bin"
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $u='https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_win64.exe.zip'; $z='%~dp0.godot-bin\godot.zip'; Invoke-WebRequest -Uri $u -OutFile $z; Expand-Archive -Path $z -DestinationPath '%~dp0.godot-bin' -Force; Remove-Item $z" 2>nul
+  if exist "%GODOT_BIN%" (
+    set "GODOT=%GODOT_BIN%"
+    echo Got it.
+  )
+)
+
 if not defined GODOT goto :no_godot
 
 REM --- 3) Controls + launch -------------------------------------------------
@@ -78,14 +92,11 @@ goto :end
 
 :no_godot
 echo.
-echo *** Godot was not found on this PC. ***
+echo *** Couldn't get Godot running automatically. ***
 echo.
-echo HoopClone runs in Godot 4. To fix this once:
-echo   1^) Install Godot 4   ^(https://godotengine.org/download^)
-echo   2^) Make a file next to this one named:   godot-path.txt
-echo   3^) Put the FULL path to your Godot .exe on the first line, e.g.:
-echo        C:\Godot\Godot_v4.3-stable_win64.exe
-echo   Then double-click PLAY.bat again.
+echo This almost always means no internet right now (or a firewall/antivirus
+echo blocked the download). Reconnect and double-click PLAY.bat again - it will
+echo finish downloading Godot itself. Nothing for you to install.
 echo.
 
 :end

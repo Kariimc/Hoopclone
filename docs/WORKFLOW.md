@@ -24,15 +24,12 @@ That's the whole workflow: **Get-Latest → work → Save-Work**, and **Play** a
 time you want to see the latest build. Do that on every machine and the cloud
 and the laptop stay identical.
 
-### One-time PLAY setup
+### PLAY needs no setup
 
-`PLAY.bat` needs to know where Godot is. It checks, in order: a `godot-path.txt`
-file you create, your PATH, next to the script, and the common install folders —
-so most of the time it just works. If it can't find Godot, it tells you exactly
-what to do: install Godot 4, then make a file next to `PLAY.bat` called
-`godot-path.txt` with the full path to your Godot `.exe` on the first line (e.g.
-`C:\Godot\Godot_v4.3-stable_win64.exe`). That file is per-machine and isn't
-synced. **Controls:** move with WASD / arrows, hold **Space** to shoot.
+Just double-click `PLAY.bat`. It finds Godot if it's installed, and if it isn't,
+it **downloads Godot itself** the first time (into a per-machine `.godot-bin`
+folder that isn't synced) — nothing for you to install. **Controls:** move with
+WASD / arrows, hold **Space** to shoot.
 
 ## One-time cleanup (the cause of the trouble)
 
