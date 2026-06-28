@@ -7,6 +7,15 @@ extends Node3D
 
 @export var roster_json: String = "res://data/rosters/crimson.json"
 
+# --- Optional hand-placed binaries (gitignored; see docs/ASSET_INDEX.md) ---
+# The rigged player GLB and the hardwood floor photo don't travel with the repo,
+# so the scene must load WITHOUT them. When present they're hydrated at runtime;
+# when absent we fall back to a placeholder body + plain floor colour so the
+# project always opens and runs. Drop the real files in and they light up — no
+# code change needed.
+const COURT_FLOOR_TEX := "res://assets/textures/court_floor.jpeg"
+const PLAYER_MESH_GLB := "res://assets/models/player_base.glb"
+
 # --- Dark underfloor (one big plane under everything; seamless by overshoot) ---
 const UNDERFLOOR_SIZE := 60.0
 const UNDERFLOOR_Y := -0.05       # between court (Y0) and ArenaFloor (-0.10)
@@ -95,8 +104,54 @@ func _ready() -> void:
 	if cam != null and player != null:
 		cam.set_target(player)
 
+	_apply_court_floor()
+	_ensure_player_body(player)
 	_build_crowd_bowl()
 	_build_courtside()
+
+func _apply_court_floor() -> void:
+	# Drop the hardwood photo onto the court plane if it's been placed; otherwise
+	# the scene's wood-brown fallback colour stands in.
+	if not ResourceLoader.exists(COURT_FLOOR_TEX):
+		print("Court floor texture not found (%s) — using fallback colour." % COURT_FLOOR_TEX)
+		return
+	var mesh_node := get_node_or_null("Floor/FloorMesh") as MeshInstance3D
+	if mesh_node == null:
+		return
+	var prim := mesh_node.mesh as PrimitiveMesh
+	var mat := (prim.material if prim != null else null) as StandardMaterial3D
+	if mat == null:
+		return
+	var tex := load(COURT_FLOOR_TEX) as Texture2D
+	if tex != null:
+		mat.albedo_texture = tex
+		print("Court floor texture applied from %s" % COURT_FLOOR_TEX)
+
+func _ensure_player_body(player: Node3D) -> void:
+	# Instance the rigged GLB if it's been placed; otherwise spawn a capsule
+	# placeholder so the player is visible and later sprints aren't blocked on art.
+	if player == null:
+		return
+	if ResourceLoader.exists(PLAYER_MESH_GLB):
+		var packed := load(PLAYER_MESH_GLB) as PackedScene
+		if packed != null:
+			var inst := packed.instantiate()
+			inst.name = "player_base"
+			player.add_child(inst)
+			print("Player mesh instanced from %s" % PLAYER_MESH_GLB)
+			return
+	print("Player mesh not found (%s) — using capsule placeholder." % PLAYER_MESH_GLB)
+	var ph := MeshInstance3D.new()
+	ph.name = "PlaceholderBody"
+	var capsule := CapsuleMesh.new()
+	capsule.radius = 0.35
+	capsule.height = 1.9
+	ph.mesh = capsule
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.78, 0.20, 0.18)   # crimson, matches the team
+	ph.material_override = mat
+	ph.position = Vector3(0.0, 0.95, 0.0)   # stand the capsule on the floor
+	player.add_child(ph)
 
 func _build_crowd_bowl() -> void:
 	# Reuse the crowd texture already on the flat back wall, then hide that wall —

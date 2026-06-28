@@ -1,14 +1,12 @@
-[gd_scene load_steps=17 format=3 uid="uid://dxa0cvk3gyv5d"]
+[gd_scene load_steps=15 format=3 uid="uid://dxa0cvk3gyv5d"]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
-[ext_resource type="PackedScene" uid="uid://bjdfcbjufl34w" path="res://assets/models/player_base.glb" id="3_exa1i"]
-[ext_resource type="Texture2D" uid="uid://boeoxksph8jl3" path="res://assets/textures/court_floor.jpeg" id="3_nb6fj"]
 [ext_resource type="Script" path="res://game/player/player.gd" id="4_pqlpv"]
 [ext_resource type="Texture2D" uid="uid://ccxwsosmpksaq" path="res://game/crowd_panorama_dense.png" id="6_0o3mu"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d6fye"]
-albedo_texture = ExtResource("3_nb6fj")
+albedo_color = Color(0.52, 0.34, 0.17, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_1lkmb"]
 material = SubResource("StandardMaterial3D_d6fye")
@@ -80,9 +78,6 @@ surface_material_override/0 = SubResource("StandardMaterial3D_3fo0c")
 script = ExtResource("4_pqlpv")
 court_half_x = 13.5
 court_half_z = 7.2
-
-[node name="player_base" parent="Player" instance=ExtResource("3_exa1i")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.01, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape3D_5rctg")
