@@ -52,13 +52,28 @@ func apply_team(root: Node, team_id: String, jersey_surface: String = "Jersey") 
 		mi.set_surface_override_material(surf, mat)
 
 func _assign_tex(mat: StandardMaterial3D, slot: String, path: String) -> void:
-	if path == "" or not ResourceLoader.exists(path):
+	var resolved := _resolve(path)
+	if resolved == "":
 		return
-	var tex: Texture2D = load(path)
+	var tex: Texture2D = load(resolved)
 	if slot == "albedo":
 		mat.albedo_texture = tex
 	elif slot == "normal":
 		mat.normal_texture = tex
+
+## Return `path` if it exists, else the same basename with a different common
+## image extension (so a dropped .jpg still resolves a manifest .png entry), else "".
+func _resolve(path: String) -> String:
+	if path == "":
+		return ""
+	if ResourceLoader.exists(path):
+		return path
+	var base := path.get_basename()
+	for ext in ["png", "jpg", "jpeg", "webp"]:
+		var candidate := "%s.%s" % [base, ext]
+		if ResourceLoader.exists(candidate):
+			return candidate
+	return ""
 
 func _find_mesh_instances(node: Node, out: Array = []) -> Array:
 	if node is MeshInstance3D:

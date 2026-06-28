@@ -1,12 +1,16 @@
 # HoopClone — Asset Index
 
-Every locked asset, what it is, and where it goes in the Godot project. Download
-each from its widget in chat (or your Higgsfield library by job ID), then drop it
-at the **target path**. Create folders that don't exist yet (right-click a folder
-in Godot's FileSystem → New Folder).
+Every locked asset, what it is, and where it goes in the Godot project.
 
-> Note: Higgsfield download links can't be fetched into the repo automatically
-> (the asset host is firewalled), so these are placed by hand once.
+> **How art gets into the game (read this).** The build reads art only from the
+> **git repo**. A cloud session clones a fresh copy and cannot see images posted
+> in chat, earlier sessions, your local downloads, or Higgsfield's servers (the
+> CDN is blocked by network policy). So art must be **committed to the repo** to
+> appear in the build — posting it in chat does nothing for the game.
+>
+> **The easy way:** double-click **`ADD-ASSETS.bat`** in the project root, pick
+> each image when prompted, and it copies them to the right place and uploads
+> them. No paths or renaming. The game then uses them automatically.
 
 ## Engine assets — import these into the project
 
