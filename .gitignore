@@ -1,11 +1,6 @@
-# Godot
+# Godot — only the regenerable import CACHE is ignored; it rebuilds on open.
 .godot/
 export_presets.cfg
-# Only ignore Godot import sidecars under assets/, whose binaries are hand-placed
-# and not tracked (see below). Import files for COMMITTED assets — anything under
-# game/ or the repo root — must travel with the repo, or their textures/models
-# break on a fresh clone.
-assets/**/*.import
 
 # Python
 __pycache__/
@@ -17,9 +12,9 @@ venv/
 # Generated rosters (regenerate via export_roster.py); keep a sample if useful
 # data/rosters/*.json
 
-# Binary assets — placed by hand per docs/ASSET_INDEX.md; only their origins are
-# tracked (assets/manifest.json / assets/team_manifest.json), not the binaries.
-assets/models/*.glb
-assets/textures/*.png
-assets/textures/*.jpeg
-assets/env/*.png
+# ---------------------------------------------------------------------------
+# Art/binary assets (.glb / .png / .jpeg) and their .import sidecars are now
+# COMMITTED to the repo, NOT hand-placed. The GitHub repo is the single source
+# of truth for every machine (cloud + laptop) — see docs/WORKFLOW.md.
+# Do NOT re-add ignore rules for assets/, or copies will drift out of sync again.
+# ---------------------------------------------------------------------------
