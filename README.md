@@ -1,5 +1,7 @@
 # HoopClone
 
+[![CI](https://github.com/Kariimc/Hoopclone/actions/workflows/ci.yml/badge.svg)](https://github.com/Kariimc/Hoopclone/actions/workflows/ci.yml)
+
 Data-driven basketball simulation, Hoop Land–inspired, with a CEO/ownership
 layer on top. **Engine: Godot 4. Data: nba_api (via a Python toolchain).**
 

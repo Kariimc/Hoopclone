@@ -10,17 +10,26 @@ Everything the project needs — code *and* art (the player mesh, court, jerseys
 crowd) — now lives **inside** the repo. There are no more hand-placed files.
 So a fresh, up-to-date copy is always a complete, working project.
 
-## The only two actions you ever take
+## The actions you ever take
 
-In the top folder of the project there are two scripts. You double-click them — no typing.
+In the top folder of the project there are scripts. You double-click them — no typing.
 
 | When | Double-click | What it does |
 |------|--------------|--------------|
 | **Before** you start working | `GET-LATEST.bat` | Pulls the newest version from GitHub so you're not on a stale copy. |
+| **To test the game** | `PLAY.bat` | Pulls the latest, then launches the game in Godot so you can play the current build. |
 | **After** you finish working | `SAVE-WORK.bat` | Uploads everything you changed to GitHub so the other machine can get it. |
 
-That's the whole workflow: **Get-Latest → work → Save-Work.** Do that on every
-machine and the cloud and the laptop stay identical.
+That's the whole workflow: **Get-Latest → work → Save-Work**, and **Play** any
+time you want to see the latest build. Do that on every machine and the cloud
+and the laptop stay identical.
+
+### PLAY needs no setup
+
+Just double-click `PLAY.bat`. It finds Godot if it's installed, and if it isn't,
+it **downloads Godot itself** the first time (into a per-machine `.godot-bin`
+folder that isn't synced) — nothing for you to install. **Controls:** move with
+WASD / arrows, hold **Space** to shoot.
 
 ## One-time cleanup (the cause of the trouble)
 

@@ -14,7 +14,9 @@ p = skill(rating) * distance_factor(d) * contest_factor * timing_factor
   Caller passes Shooting for twos, ThreePT for threes.
 - **distance_factor(d):** full inside 1 m, loses ~6%/m, floored at 0.12 so deep
   heaves aren't impossible.
-- **contest_factor:** full pressure removes 55% of the make (defenders Sprint 5).
+- **contest_factor:** full pressure removes 55% of the make. The 0-1 `contest`
+  scalar comes from the **contest model** (`docs/CONTEST_MODEL.md`) — defender
+  proximity × shot-lane angle × defensive rating.
 - **timing_factor:** worst release removes 60%.
 - Clamped to [0.02, 0.98].
 
