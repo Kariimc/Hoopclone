@@ -22,6 +22,28 @@ const COURT_FLOOR_CANDIDATES := [
 ]
 const PLAYER_MESH_GLB := "res://assets/models/player_base.glb"
 
+# Ball skin (the locked leather photo). Dropped in via ADD-ASSETS; orange fallback
+# until then. Albedo + optional derived normal map, any common image extension.
+const BALL_ALBEDO_CANDIDATES := [
+	"res://assets/textures/ball_albedo.png",
+	"res://assets/textures/ball_albedo.jpg",
+	"res://assets/textures/ball_albedo.jpeg",
+	"res://assets/textures/ball_albedo.webp",
+]
+const BALL_NORMAL_CANDIDATES := [
+	"res://assets/textures/ball_normal.png",
+	"res://assets/textures/ball_normal.jpg",
+	"res://assets/textures/ball_normal.jpeg",
+	"res://assets/textures/ball_normal.webp",
+]
+
+## First path in `candidates` that exists on disk, or "" if none are present.
+static func _first_existing(candidates: Array) -> String:
+	for path in candidates:
+		if ResourceLoader.exists(path):
+			return path
+	return ""
+
 # --- Dark underfloor (one big plane under everything; seamless by overshoot) ---
 const UNDERFLOOR_SIZE := 60.0
 const UNDERFLOOR_Y := -0.05       # between court (Y0) and ArenaFloor (-0.10)
@@ -198,7 +220,16 @@ func _equip_player_shot(player: Node3D) -> void:
 	sphere.height = 0.24
 	mesh.mesh = sphere
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.40, 0.15)   # basketball orange
+	mat.albedo_color = Color(0.85, 0.40, 0.15)   # orange fallback until the leather photo is dropped in
+	var ball_albedo := _first_existing(BALL_ALBEDO_CANDIDATES)
+	if ball_albedo != "":
+		mat.albedo_texture = load(ball_albedo) as Texture2D
+		mat.albedo_color = Color.WHITE   # let the texture show its true colour
+		print("Ball albedo applied from %s" % ball_albedo)
+	var ball_normal := _first_existing(BALL_NORMAL_CANDIDATES)
+	if ball_normal != "":
+		mat.normal_enabled = true
+		mat.normal_texture = load(ball_normal) as Texture2D
 	mesh.material_override = mat
 	ball.add_child(mesh)
 	ball.global_position = player.global_position + Vector3(0.0, 1.0, 0.0)

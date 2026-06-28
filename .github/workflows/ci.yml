@@ -41,3 +41,25 @@ jobs:
 
       - name: Run data + sim test suites
         run: python -m pytest tools -v
+
+  godot-tests:
+    name: Godot engine self-test
+    runs-on: ubuntu-latest
+    # Runs the REAL GDScript sim (game/core/*.gd) headlessly so the engine-side
+    # behaviour is verified, not just the Python mirror. Pinned to the project's
+    # Godot version (project.godot config/features "4.3").
+    env:
+      GODOT_VERSION: "4.3-stable"
+      GODOT_BIN: Godot_v4.3-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot ${{ env.GODOT_VERSION }} (headless)
+        run: |
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_BIN}.zip"
+          curl -fsSL -o godot.zip "$url"
+          unzip -q godot.zip
+          chmod +x "$GODOT_BIN"
+
+      - name: Run Godot self-test
+        run: ./"$GODOT_BIN" --headless --path . --script res://tests/godot/run_tests.gd
