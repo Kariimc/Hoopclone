@@ -4,7 +4,8 @@ cd /d "%~dp0"
 echo.
 echo Getting the latest version...
 echo.
-git pull
+REM --autostash protects any work-in-progress so the update can't be blocked.
+git pull --rebase --autostash
 echo.
 if %errorlevel%==0 (
   echo Done. You are up to date. Open the project in Godot now.
