@@ -3,6 +3,38 @@
 Locked decisions, newest context first. This is the single source of truth for
 "why is it built this way" so no decision gets relitigated from memory.
 
+## Sprint 4.5 — box-score prep refactor
+
+Bridge work between the Sprint 4 asset pipeline and the Sprint 5 box-score
+simulator. Three bug fixes + a `main.gd` split, no gameplay features added.
+
+- **Ball rebound signal is separate from the miss outcome.** `ball.gd` now has
+  **two** signals: `missed` (the OUTCOME — emitted the instant a shot is decided
+  a miss, while the bounce is just starting) and a new `rebound_live` (emitted
+  later, when the ball has finished bouncing and is actually grabbable). We chose
+  to ADD `rebound_live` rather than move `missed` to the settle point, because
+  the box score needs both moments — "shot missed" (for the stat line) and "ball
+  is now live" (for rebound logic) — and moving `missed` would have broken any
+  existing listener that treats it as the outcome. Additive, non-breaking.
+- **A "miss" can no longer swish.** `shot.gd` picked the miss target with a square
+  ±0.35 m x/z offset; with a 0.23 m rim radius some of those offsets landed inside
+  the rim and fell clean through. Replaced with a polar offset on a ring strictly
+  OUTSIDE the rim (`rad ∈ [rim+0.05, 0.40]`), keeping the small vertical jitter.
+- **Silent defender no-op is now loud.** If the shot never got a `ShotController`
+  (e.g. `RightHoop` missing so equip early-returned, or `_ready` ordering broke),
+  defender registration used to no-op silently — every shot uncontested, no error.
+  It now emits a `push_warning` on that path. A headless scene-smoke test
+  (`tests/godot/run_tests.gd`) boots `main.tscn` and asserts the player ends
+  `_ready` with a shot, ball, rim, and ≥1 registered defender, so the whole
+  boot-order bug class fails CI instead of shipping quiet.
+- **`main.gd` split into helpers.** The 388-line boot script is now ~65 lines of
+  `_ready()` orchestration. Behaviour-preserving extractions to static helper
+  classes (each a `class_name`, called on the same host node so node wiring and
+  order are identical): `CrowdBowl` (`game/arena/crowd_bowl.gd`), `ArenaBuilder`
+  (`game/arena/arena_builder.gd`), `Spawner` (`game/boot/spawner.gd`). Chose
+  static host-param helpers over child-node scripts so the scene tree and
+  `_ready` ordering are untouched.
+
 ## Stack
 
 - **Engine: Godot 4** (Forward+). Chosen over Ursina for native AnimationTree,

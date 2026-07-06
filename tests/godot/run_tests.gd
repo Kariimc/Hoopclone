@@ -48,11 +48,38 @@ func _initialize() -> void:
 	_check("shot: probability within [P_MIN, P_MAX]",
 		open_p >= ShotModel.P_MIN and open_p <= ShotModel.P_MAX)
 
+	_scene_smoke()
+
 	if _fails == 0:
 		print("ALL GODOT TESTS PASSED")
 	else:
 		printerr("%d GODOT TEST(S) FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
+
+## Boot the REAL main.tscn headlessly and assert the Sprint 5 wiring survived
+## _ready(): the player must come out with a shot, a ball, a rim, and at least one
+## registered defender. `add_child` fires `_ready` synchronously, so by the time it
+## returns the whole boot chain has run. This catches the boot-order bug class — a
+## missing RightHoop, an early-return in equip, or a defender that never registers
+## (which would silently leave every shot uncontested).
+func _scene_smoke() -> void:
+	var packed: PackedScene = load("res://game/main.tscn")
+	_check("scene: main.tscn loads", packed != null)
+	if packed == null:
+		return
+	var main: Node = packed.instantiate()
+	get_root().add_child(main)
+
+	var player := main.get_node_or_null("Player") as Player
+	_check("scene: Player node present", player != null)
+	if player != null:
+		_check("scene: player has a ShotController", player.shot != null)
+		if player.shot != null:
+			_check("scene: shot equipped with a ball", player.shot.ball != null)
+			_check("scene: shot equipped with a rim", player.shot.rim != null)
+			_check("scene: >=1 defender registered", player.shot.defenders.size() >= 1)
+
+	main.free()
 
 func _check(label: String, cond: bool) -> void:
 	if cond:

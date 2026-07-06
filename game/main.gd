@@ -4,117 +4,21 @@ extends Node3D
 ## that wraps the far side and both baskets but stays OPEN behind the camera, so
 ## the broadcast cam never clips into a near wall when it pans toward a basket.
 ## Dark underfloor keeps court-to-stands gaps reading as floor, not void.
+##
+## This file is now just _ready() orchestration. The heavy lifting lives in
+## extracted helpers (Sprint 5 refactor): CrowdBowl (game/arena/crowd_bowl.gd),
+## ArenaBuilder (game/arena/arena_builder.gd), and Spawner (game/boot/spawner.gd).
 
 @export var roster_json: String = "res://data/rosters/crimson.json"
 ## Team kit the boot player wears (key in assets/team_manifest.json: CRW/STM/BAY).
 @export var player_team: String = "CRW"
 
-# --- Optional hand-placed binaries (gitignored; see docs/ASSET_INDEX.md) ---
-# The rigged player GLB and the hardwood floor photo don't travel with the repo,
-# so the scene must load WITHOUT them. When present they're hydrated at runtime;
-# when absent we fall back to a placeholder body + plain floor colour so the
-# project always opens and runs. Drop the real files in and they light up — no
-# code change needed.
-const COURT_FLOOR_CANDIDATES := [
-	"res://assets/textures/court_floor.jpeg",
-	"res://assets/textures/court_floor.png",
-	"res://assets/textures/court_floor.jpg",
-]
-const PLAYER_MESH_GLB := "res://assets/models/player_base.glb"
-
-# Ball skin (the locked leather photo). Dropped in via ADD-ASSETS; orange fallback
-# until then. Albedo + optional derived normal map, any common image extension.
-const BALL_ALBEDO_CANDIDATES := [
-	"res://assets/textures/ball_albedo.png",
-	"res://assets/textures/ball_albedo.jpg",
-	"res://assets/textures/ball_albedo.jpeg",
-	"res://assets/textures/ball_albedo.webp",
-]
-const BALL_NORMAL_CANDIDATES := [
-	"res://assets/textures/ball_normal.png",
-	"res://assets/textures/ball_normal.jpg",
-	"res://assets/textures/ball_normal.jpeg",
-	"res://assets/textures/ball_normal.webp",
-]
-
-## First path in `candidates` that exists on disk, or "" if none are present.
-static func _first_existing(candidates: Array) -> String:
-	for path in candidates:
-		if ResourceLoader.exists(path):
-			return path
-	return ""
-
-# --- Dark underfloor (one big plane under everything; seamless by overshoot) ---
-const UNDERFLOOR_SIZE := 60.0
-const UNDERFLOOR_Y := -0.05       # between court (Y0) and ArenaFloor (-0.10)
-
-# --- Crowd arc (curved wall; OPEN on the camera side) ---
-const BOWL_BOTTOM_RADIUS := 22.0
-const BOWL_TOP_RADIUS := 26.0     # wider top = raked seating, flares outward
-const BOWL_Y_BOTTOM := -3.0       # starts below the floor (hidden), rises up
-const BOWL_Y_TOP := 12.0
-const BOWL_ARC_DEG := 260.0       # degrees of crowd; the rest is open toward the camera
-const BOWL_SEGMENTS := 64
-const CROWD_IDLE_INTENSITY := 0.25
+# Optional hand-placed binaries (the rigged player GLB, the hardwood floor photo,
+# the leather ball skin) are gitignored; see docs/ASSET_INDEX.md. The scene loads
+# and runs WITHOUT them — the helpers fall back to placeholders — and lights up
+# automatically when the real files are dropped in. No code change needed.
 
 var _crowd_mat: ShaderMaterial    # held so gameplay can crank hype later
-
-# Animates the crowd texture: sway, soft glowing camera flashes, brightness
-# breath, and drift to soften tiling. uv_scale is the fan-size dial — HIGHER =
-# more copies = SMALLER fans (4 keeps the photo's proportions correct). Unshaded.
-const CROWD_SHADER := """
-shader_type spatial;
-render_mode cull_disabled, unshaded;
-
-uniform sampler2D crowd_tex : source_color, filter_linear, repeat_enable;
-uniform float intensity : hint_range(0.0, 1.0) = 0.25;
-uniform float uv_scale = 4.0;
-uniform float sway_amount = 0.006;
-uniform float sway_speed = 1.2;
-uniform float flash_amount = 1.0;
-
-float hash21(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
-}
-
-void fragment() {
-	vec2 raw = UV;          // 0..1 across the arc; drives flashes + drift
-	vec2 uv = UV;
-	uv.x *= uv_scale;       // tiled; samples the crowd texture
-
-	// Sway: slow per-column vertical shimmer, like a crowd shifting in place.
-	float sway = sin(uv.x * 6.2831 + TIME * sway_speed) * sway_amount * (0.5 + intensity);
-	uv.y += sway;
-
-	vec3 col = texture(crowd_tex, uv).rgb;
-
-	// Drift: smooth brightness + tint variation at a different frequency than the
-	// tiling, so repeats stop reading as stamped copies. No hard seams.
-	float drift = sin(raw.x * 9.0) * 0.5 + sin(raw.x * 23.0 + 1.3) * 0.3 + sin(raw.x * 4.0 + 2.1) * 0.2;
-	col *= 1.0 + drift * 0.10;
-	float tintmix = sin(raw.x * 13.0) * 0.5 + 0.5;
-	col *= mix(vec3(1.03, 1.0, 0.97), vec3(0.97, 1.0, 1.03), tintmix);
-
-	// Camera flashes: occasional soft GLOWING pops (bright core + halo), like
-	// phone flashes in the stands. Coarse grid + radial glow = no hard pixels.
-	vec2 fgrid = vec2(34.0, 14.0);
-	vec2 fid = floor(raw * fgrid);
-	vec2 fuv = fract(raw * fgrid) - 0.5;
-	float fh = hash21(fid);
-	float fphase = fract(fh * 27.0 + TIME * 0.8);       // each cell on its own clock
-	float pop = 1.0 - smoothstep(0.0, 0.09, fphase);    // brief bright pop, then fade
-	float glow = exp(-dot(fuv, fuv) * 22.0);            // soft radial glow, core to halo
-	float spark = step(0.96, fh) * pop * glow;          // only the rare cells, rarely
-	col += vec3(0.9, 0.95, 1.0) * spark * flash_amount * (1.0 + intensity);
-
-	// Brightness breath: gentle, lifts when hyped.
-	col *= 1.0 + sin(TIME * 1.7) * 0.04 * (0.4 + intensity);
-
-	ALBEDO = col;
-}
-"""
 
 func _ready() -> void:
 	var gs := GameState.new()
@@ -132,247 +36,23 @@ func _ready() -> void:
 	if cam != null and player != null:
 		cam.set_target(player)
 
-	_apply_roster_to_player(player, roster)
-	_apply_court_floor()
-	_ensure_player_body(player)
-	_equip_player_shot(player)
-	_spawn_defender(player)
-	_build_crowd_bowl()
-	_build_courtside()
-
-func _apply_court_floor() -> void:
-	# Drop the hardwood photo onto the court plane if it's been placed (any of the
-	# accepted extensions); otherwise the scene's wood-brown fallback stands in.
-	var path := ""
-	for candidate in COURT_FLOOR_CANDIDATES:
-		if ResourceLoader.exists(candidate):
-			path = candidate
-			break
-	if path.is_empty():
-		print("Court floor texture not found — using fallback colour.")
-		return
-	var mesh_node := get_node_or_null("Floor/FloorMesh") as MeshInstance3D
-	if mesh_node == null:
-		return
-	var prim := mesh_node.mesh as PrimitiveMesh
-	var mat := (prim.material if prim != null else null) as StandardMaterial3D
-	if mat == null:
-		return
-	var tex := load(path) as Texture2D
-	if tex != null:
-		mat.albedo_texture = tex
-		print("Court floor texture applied from %s" % path)
-
-func _ensure_player_body(player: Node3D) -> void:
-	# Instance the rigged GLB if it's been placed; otherwise spawn a capsule
-	# placeholder so the player is visible and later sprints aren't blocked on art.
-	if player == null:
-		return
-	if ResourceLoader.exists(PLAYER_MESH_GLB):
-		# Dress the mesh in the team kit via the apparel pipeline (texture swap on
-		# the fixed base mesh — the locked art-direction rule). Jersey textures
-		# that aren't placed yet are simply skipped, so the bare mesh still shows.
-		var loader := AssetLoader.new()
-		add_child(loader)
-		var inst := loader.spawn_player(player_team)
-		inst.name = "player_base"
-		player.add_child(inst)
-		print("Player mesh instanced + dressed (%s) from %s" % [player_team, PLAYER_MESH_GLB])
-		return
-	print("Player mesh not found (%s) — using capsule placeholder." % PLAYER_MESH_GLB)
-	var ph := MeshInstance3D.new()
-	ph.name = "PlaceholderBody"
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.35
-	capsule.height = 1.9
-	ph.mesh = capsule
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.78, 0.20, 0.18)   # crimson, matches the team
-	ph.material_override = mat
-	ph.position = Vector3(0.0, 0.95, 0.0)   # stand the capsule on the floor
-	player.add_child(ph)
-
-func _apply_roster_to_player(player: Node3D, roster: Array) -> void:
-	# Make the boot player attribute-driven: hydrate it from the first roster
-	# entry so Speed / Shooting / defensive ratings reflect real data instead of
-	# the flat-50 defaults. Read at call-time by max_speed() and the shot model.
-	if player == null or roster.is_empty() or not (player is Player):
-		return
-	(player as Player).attributes = Attributes.from_json(roster[0])
-	print("Player attributes from roster: %s" % roster[0].get("name", "?"))
-
-func _equip_player_shot(player: Node3D) -> void:
-	# Sprint 5: actually wire the shot so the defender's contest can affect it.
-	# Without a ball + rim, ShotController.start_charge() no-ops and the whole
-	# contest chain is dead. Spawn a visible ball, equip it against the right hoop,
-	# and pop the crowd on a make (the documented Sprint 5 crowd hook).
-	if not (player is Player):
-		return
-	var rim := get_node_or_null("RightHoop") as Node3D
-	if rim == null:
-		return
-	var ball := Ball.new()
-	ball.name = "Ball"
-	add_child(ball)
-	var mesh := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.12
-	sphere.height = 0.24
-	mesh.mesh = sphere
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.40, 0.15)   # orange fallback until the leather photo is dropped in
-	var ball_albedo := _first_existing(BALL_ALBEDO_CANDIDATES)
-	if ball_albedo != "":
-		mat.albedo_texture = load(ball_albedo) as Texture2D
-		mat.albedo_color = Color.WHITE   # let the texture show its true colour
-		print("Ball albedo applied from %s" % ball_albedo)
-	var ball_normal := _first_existing(BALL_NORMAL_CANDIDATES)
-	if ball_normal != "":
-		mat.normal_enabled = true
-		mat.normal_texture = load(ball_normal) as Texture2D
-	mesh.material_override = mat
-	ball.add_child(mesh)
-	ball.global_position = player.global_position + Vector3(0.0, 1.0, 0.0)
-	(player as Player).equip(ball, rim)
-	ball.made.connect(_on_basket_made)
-	print("Player equipped: ball + RightHoop. Hold 'shoot' to fire.")
+	Spawner.apply_roster_to_player(player, roster)
+	ArenaBuilder.apply_court_floor(self)
+	Spawner.ensure_player_body(self, player, player_team)
+	Spawner.equip_player_shot(self, player, _on_basket_made)
+	Spawner.spawn_defender(self, player)
+	_crowd_mat = CrowdBowl.build(self)
+	ArenaBuilder.build_courtside(self)
 
 func _on_basket_made() -> void:
 	# Crowd roars on a make, then eases back to idle.
-	set_crowd_intensity(1.0)
+	_set_crowd_intensity(1.0)
 	var tw := create_tween()
-	tw.tween_method(set_crowd_intensity, 1.0, CROWD_IDLE_INTENSITY, 2.5)
+	tw.tween_method(_set_crowd_intensity, 1.0, CrowdBowl.IDLE_INTENSITY, 2.5)
 
-func _spawn_defender(player: Node3D) -> void:
-	# Sprint 5: an on-ball defender that marks the player and protects the right
-	# basket, sliding to stay in the lane. Its positioning feeds ContestModel, so
-	# a contested shot's make % drops.
-	if player == null:
-		return
-	var rim := get_node_or_null("RightHoop") as Node3D
-	if rim == null:
-		return
-	var defender := Defender.new()
-	defender.name = "Defender"
-	# Match the attacker's Speed so the only gap is the defender's lower base
-	# speed (3.8 vs 4.0) — a touch slower, beatable with a first step, exactly as
-	# decided. Defensive ratings stay high so the contest actually bites.
-	var atk_speed := 50
-	if player is Player:
-		atk_speed = (player as Player).attributes.get_attr("speed")
-	defender.attributes = Attributes.new({"perim_d": 74, "inside_d": 70, "speed": atk_speed})
-	add_child(defender)
-	defender.global_position = Vector3(3.0, 0.0, 0.0)   # between player and right hoop
-	defender.assign(player, rim)
-
-	# Give the body a collider + a visible capsule (contrasting colour vs the player).
-	var col := CollisionShape3D.new()
-	var shape := CapsuleShape3D.new()
-	shape.radius = 0.35
-	shape.height = 1.9
-	col.shape = shape
-	col.position = Vector3(0.0, 0.95, 0.0)
-	defender.add_child(col)
-	var body := MeshInstance3D.new()
-	body.name = "DefenderBody"
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.35
-	capsule.height = 1.9
-	body.mesh = capsule
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.16, 0.32, 0.62)   # blue, the opposing kit
-	body.material_override = mat
-	body.position = Vector3(0.0, 0.95, 0.0)
-	defender.add_child(body)
-
-	# Register the defender so a taken shot is contested. Safe even before the
-	# shot is equipped with a ball/rim — set_defenders just stores the list.
-	if player is Player and (player as Player).shot != null:
-		var marking: Array[Defender] = [defender]
-		(player as Player).shot.set_defenders(marking)
-	print("Defender spawned: marks the player, protects RightHoop.")
-
-func _build_crowd_bowl() -> void:
-	# Reuse the crowd texture already on the flat back wall, then hide that wall —
-	# the arc replaces it. To swap in a new crowd image, just drop it on
-	# Stands_Far's Albedo texture slot; this code picks it up automatically.
-	var crowd_tex: Texture2D = null
-	var back := get_node_or_null("Stands_Far") as MeshInstance3D
-	if back != null:
-		var src := back.get_active_material(0) as StandardMaterial3D
-		if src != null:
-			crowd_tex = src.albedo_texture
-		back.visible = false
-	if crowd_tex == null:
-		push_warning("No crowd texture on Stands_Far — arc will render blank.")
-
-	var shader := Shader.new()
-	shader.code = CROWD_SHADER
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
-	mat.set_shader_parameter("crowd_tex", crowd_tex)
-	mat.set_shader_parameter("intensity", CROWD_IDLE_INTENSITY)
-	_crowd_mat = mat
-
-	var bowl := MeshInstance3D.new()
-	bowl.name = "Crowd_Bowl"
-	bowl.mesh = _make_crowd_arc()
-	bowl.material_override = mat
-	add_child(bowl)
-	print("Crowd arc built: r %.0f-%.0f, arc %.0f deg" % [BOWL_BOTTOM_RADIUS, BOWL_TOP_RADIUS, BOWL_ARC_DEG])
-
-func _make_crowd_arc() -> ArrayMesh:
-	# A vertical curved strip swept over BOWL_ARC_DEG degrees, centered on the far
-	# sideline (-Z) and left open around the near side (+Z) where the camera lives.
-	var verts := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	var indices := PackedInt32Array()
-	var half := BOWL_ARC_DEG * 0.5
-	for i in range(BOWL_SEGMENTS + 1):
-		var t := float(i) / float(BOWL_SEGMENTS)
-		var ang := deg_to_rad(-half + BOWL_ARC_DEG * t)
-		var sx := sin(ang)
-		var sz := -cos(ang)   # ang 0 -> -Z (far crowd); opening is centered on +Z
-		verts.push_back(Vector3(sx * BOWL_BOTTOM_RADIUS, BOWL_Y_BOTTOM, sz * BOWL_BOTTOM_RADIUS))
-		uvs.push_back(Vector2(t, 1.0))
-		verts.push_back(Vector3(sx * BOWL_TOP_RADIUS, BOWL_Y_TOP, sz * BOWL_TOP_RADIUS))
-		uvs.push_back(Vector2(t, 0.0))
-	for i in range(BOWL_SEGMENTS):
-		var b0 := 2 * i
-		var t0 := 2 * i + 1
-		var b1 := 2 * (i + 1)
-		var t1 := 2 * (i + 1) + 1
-		indices.append_array([b0, t0, t1, b0, t1, b1])
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-## Gameplay hook (Sprint 5): call on a made basket / big play to spike the crowd,
-## then ease the value back toward idle from the caller. 0 = idle, 1 = roaring.
-func set_crowd_intensity(v: float) -> void:
-	if _crowd_mat != null:
-		_crowd_mat.set_shader_parameter("intensity", clampf(v, 0.0, 1.0))
-
-func _build_courtside() -> void:
-	# One oversized dark plane under the whole arena; gaps reveal it, not void.
-	var floor_plane := MeshInstance3D.new()
-	floor_plane.name = "Courtside_Floor"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(UNDERFLOOR_SIZE, UNDERFLOOR_SIZE)
-	floor_plane.mesh = plane
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.09, 0.08, 0.11)
-	mat.roughness = 0.6
-	mat.metallic = 0.0
-	floor_plane.material_override = mat
-	add_child(floor_plane)
-	floor_plane.position = Vector3(0.0, UNDERFLOOR_Y, 0.0)
-	print("Courtside underfloor built: %.0fx%.0f at Y %.2f" % [UNDERFLOOR_SIZE, UNDERFLOOR_SIZE, UNDERFLOOR_Y])
+## Thin wrapper so the tween has a bindable Callable; delegates to the crowd hook.
+func _set_crowd_intensity(v: float) -> void:
+	CrowdBowl.set_intensity(_crowd_mat, v)
 
 func _load_roster(path: String) -> Array:
 	if not FileAccess.file_exists(path):

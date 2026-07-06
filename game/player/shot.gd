@@ -75,10 +75,13 @@ func release() -> void:
 
 	var target: Vector3 = rim_pos
 	if not made:
-		target += Vector3(
-			randf_range(-0.35, 0.35), randf_range(-0.1, 0.1),
-			randf_range(-0.35, 0.35)
-		)
+		# Push the miss to a ring OUTSIDE the rim so a "miss" can never fall clean
+		# through. The old square ±0.35 x/z offset could land inside the 0.23 rim
+		# radius and swish. Polar offset guarantees rad > rim, keeping the small y
+		# jitter. ball.rim_radius is the same rim the ball bounces against.
+		var ang := randf() * TAU
+		var rad := randf_range(ball.rim_radius + 0.05, 0.40)
+		target += Vector3(cos(ang) * rad, randf_range(-0.1, 0.1), sin(ang) * rad)
 
 	var flight: float = clampf(0.7 + distance * 0.03, 0.7, 1.4)
 	var arc: float = clampf(1.8 + distance * 0.12, 1.8, 3.6)
