@@ -61,5 +61,11 @@ jobs:
           unzip -q godot.zip
           chmod +x "$GODOT_BIN"
 
+      # Import once so Godot generates .godot/global_script_class_cache.cfg.
+      # Without it, class_name globals (Player, Spawner, ArenaBuilder, ...) don't
+      # resolve when the scene-smoke test loads main.tscn headlessly.
+      - name: Import project (generate global class cache)
+        run: ./"$GODOT_BIN" --headless --path . --import || true
+
       - name: Run Godot self-test
         run: ./"$GODOT_BIN" --headless --path . --script res://tests/godot/run_tests.gd
