@@ -11,6 +11,11 @@ class_name Ball
 
 signal made
 signal missed
+## Fires when the ball has finished bouncing and come to rest — the moment it is
+## actually live for rebound logic. `missed` is the OUTCOME (fired the instant the
+## shot is decided a miss); `rebound_live` is the later "ball is now grabbable"
+## event. Kept separate so box-score/outcome listeners on `missed` stay intact.
+signal rebound_live
 
 @export var gravity_visual: float = 9.8
 @export var rim_radius: float = 0.23
@@ -78,3 +83,4 @@ func _step_bounce(delta: float) -> void:
 		_bounce_vel.y = -_bounce_vel.y * bounce_damping
 		if absf(_bounce_vel.y) < 0.6:
 			_bouncing = false  # ball settles -> live for rebound logic
+			rebound_live.emit()
