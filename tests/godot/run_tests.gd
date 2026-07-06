@@ -70,7 +70,10 @@ func _scene_smoke() -> void:
 	var main: Node = packed.instantiate()
 	get_root().add_child(main)
 
-	var player := main.get_node_or_null("Player") as Player
+	# Untyped on purpose: run_tests.gd can't always resolve the `Player` global
+	# class in the headless self-test scope, and the checks below only need
+	# duck-typed property access (player.shot, etc.), which works on a Node.
+	var player := main.get_node_or_null("Player")
 	_check("scene: Player node present", player != null)
 	if player != null:
 		_check("scene: player has a ShotController", player.shot != null)
