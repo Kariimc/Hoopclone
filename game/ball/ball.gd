@@ -10,6 +10,9 @@ class_name Ball
 ## point on/near the rim and bounces off.
 
 signal made
+## Fires when the ball settles after a miss (bounce has stopped, NOT when the
+## bounce starts) — this is the "ball is now live for a rebound" moment. Audit
+## §3.2: fixed before any consumer could lock in the wrong meaning.
 signal missed
 
 @export var gravity_visual: float = 9.8
@@ -64,11 +67,12 @@ func _resolve() -> void:
 		made.emit()
 	else:
 		# Kick off a short bounce off the rim/backboard before the rebound.
+		# `missed` fires once the bounce settles (below), not here — a rebound
+		# system needs "the ball is now live," not "the animation started."
 		_bouncing = true
 		_bounce_vel = Vector3(
 			randf_range(-1.5, 1.5), randf_range(1.5, 3.0), randf_range(-1.0, 1.0)
 		)
-		missed.emit()
 
 func _step_bounce(delta: float) -> void:
 	_bounce_vel.y -= gravity_visual * delta
@@ -78,3 +82,4 @@ func _step_bounce(delta: float) -> void:
 		_bounce_vel.y = -_bounce_vel.y * bounce_damping
 		if absf(_bounce_vel.y) < 0.6:
 			_bouncing = false  # ball settles -> live for rebound logic
+			missed.emit()

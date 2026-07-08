@@ -75,10 +75,13 @@ func release() -> void:
 
 	var target: Vector3 = rim_pos
 	if not made:
-		target += Vector3(
-			randf_range(-0.35, 0.35), randf_range(-0.1, 0.1),
-			randf_range(-0.35, 0.35)
-		)
+		# Polar offset with a floor just outside the rim (audit §3.1): the old
+		# cartesian offset could land inside the rim radius and a "miss" would
+		# visually swish clean through the hoop before bouncing off nothing.
+		# Guarantee the miss target clears the rim, any direction.
+		var angle := randf_range(0.0, TAU)
+		var radius := randf_range(ball.rim_radius + 0.05, 0.40)
+		target += Vector3(cos(angle) * radius, randf_range(-0.1, 0.1), sin(angle) * radius)
 
 	var flight: float = clampf(0.7 + distance * 0.03, 0.7, 1.4)
 	var arc: float = clampf(1.8 + distance * 0.12, 1.8, 3.6)
