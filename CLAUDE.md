@@ -3,6 +3,19 @@
 Read this whole file before touching code. It is written so a model can work
 here at full quality without rediscovering the project's rules the hard way.
 
+## Start here: `PROGRESS.md`
+
+**Before doing anything else, read `PROGRESS.md`.** It is the live checklist
+against `docs/HOOPCLONE-AUDIT.md` and `docs/SPRINT_6_7_ARCHITECTURE.md` — the
+first unchecked item in it IS the task. Take it, do it, check it off in the
+same PR, report, stop. **Do not re-audit the codebase, do not re-derive the
+Sprint 5 build order, do not propose an alternative plan** — that work is
+already done and re-doing it is the single biggest way a session wastes its
+budget here. If you finish an item and want to pick up the next one, keep
+going down the list in order. If `PROGRESS.md` is empty or every item is
+checked, only then fall back to `docs/HOOPCLONE-AUDIT.md` for the next tier
+of ranked work.
+
 ## What this project is
 
 Data-driven basketball sim (Hoop Land–inspired) with a CEO/ownership layer on
@@ -12,10 +25,10 @@ laptop (double-clicks `.bat` scripts, does not type commands) and from Claude
 Code cloud sessions. **You are the engineer; the docs are the spec.**
 
 Sprint status lives in `README.md`. Currently: Sprints 0–4 shipped; Sprint 5
-(box-score simulator) is next, with its build plan in
-`docs/HOOPCLONE-AUDIT.md` §5 and Sprints 6–7 designed in
-`docs/SPRINT_6_7_ARCHITECTURE.md`. **Execute against those documents — do not
-re-plan work that is already planned.**
+(box-score simulator) is in progress — see `PROGRESS.md` for exactly what's
+done and what's next, with its build plan in `docs/HOOPCLONE-AUDIT.md` §5 and
+Sprints 6–7 designed in `docs/SPRINT_6_7_ARCHITECTURE.md`. **Execute against
+those documents — do not re-plan work that is already planned.**
 
 ## The architecture in one paragraph
 
