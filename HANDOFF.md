@@ -1,48 +1,53 @@
-# HoopClone — Complete Handoff (2026-06-27)
+# HANDOFF - Kariimc/Hoopclone
 
-## Where the project lives now
-- Folder on this computer: C:\Users\Kariim\Dev\hoopclone
-- This is OUTSIDE OneDrive (OneDrive is the online-backup folder that was making
-  duplicate copies and breaking things). The path has no "OneDrive" in it.
-- Online backup (GitHub): https://github.com/Kariimc/Hoopclone.git
-- Branch in use: main
+> Continuity doc. Any agent must resume cold from this file with zero briefing.
+> Update it in the same commit as any code change.
 
-## Current state (all verified just now)
-- Computer copy and online copy MATCH exactly — same latest version (384fd25),
-  nothing waiting to upload, nothing missing.
-- The project folder is CLEAN — no half-saved or leftover files.
-- Full history intact — all 29 saved points (commits) came through the move.
-- Health check on the project's files passed — no damage.
+**Seeded:** 2026-07-15 from verified repo state. Sections marked UNVERIFIED were not
+provable from the repo alone - fill them in, do not guess.
 
-## What was wrong, and what got fixed
-1. A finished piece of work (the animated crowd/arena) was saved on the computer
-   but never uploaded to GitHub. -> Uploaded (commit cf1ca47).
-2. The crowd background image was missing from the project, so it would show up
-   blank for anyone who downloaded a fresh copy. Cause: the project was set to
-   ignore all of Godot's small "sidecar" files (the helper file Godot pairs with
-   each image), which also hid the missing image. -> Added the image and its
-   sidecar (commit ff26d24).
-3. Fixed the root cause so this can't happen again: the ignore rule now only
-   applies inside the assets\ folder. Also added two more sidecars that were
-   missing (icon and referee_ref). -> commit 384fd25.
-4. Moved the whole project out of OneDrive to C:\Users\Kariim\Dev\hoopclone, history and all.
+## Verified facts
 
-## Cleanup done / notes
-- The old, empty leftover folder in OneDrive
-  (C:\Users\Kariim\OneDrive\Desktop\Work\Dev\hoopclone_repo) has been DELETED.
-  Nothing important was in it.
-- When you moved the folder, OneDrive may have asked about deleting the old cloud
-  copy. That copy is redundant now — the real project is safe at C:\Users\Kariim\Dev\hoopclone
-  regardless of what you chose.
+| | |
+|---|---|
+| Repo | `Kariimc/Hoopclone` |
+| Namespace | user `Kariimc` |
+| Default branch | `main` |
+| Visibility | public |
+| Language | GDScript |
+| Files | 113 |
+| Last commit | 2026-07-08 - fix(scene+sim): Sprint 5 refactor-first pass + live progress tracker ( |
+| Branches | 14 |
+| Open PRs | 1 |
 
-## Going forward
-- Any new image or model you add under the game\ folder (or the project's main
-  folder) will now keep its Godot sidecar automatically. No manual steps.
-- The big files inside assets\ are still kept out of the online backup on purpose
-  (you place those by hand — see docs\ASSET_INDEX.md).
+**Top-level dirs:** `.claude`, `.github`, `assets`, `data`, `docs`, `game`, `tests`, `tools`
 
-## Recent saved points (newest first)
-- 384fd25  build: track import sidecars for committed assets, not just assets/
-- ff26d24  arena: add dense crowd panorama texture + import sidecar
-- cf1ca47  arena: animated crowd bowl + dense texture, underfloor, lighting
-- 3b7bde9  arena: three-sided crowd stands, side walls tuned
+**Root files:** `.gitattributes`, `.gitignore`, `ADD-ASSETS.bat`, `CLAUDE.md`, `GET-LATEST.bat`, `PLAY.bat`, `PROGRESS.md`, `README.md`, `SAVE-WORK.bat`, `icon.svg`, `icon.svg.import`, `manifest.json`
+
+**Existing docs:** `CLAUDE.md`, `PROGRESS.md`, `README.md`, `docs/SPRINT_6_7_ARCHITECTURE.md`
+
+## Open PRs
+
+- #16 refactor: sprint-5 prep — bug fixes + main.gd split + smoke test  `refactor/sprint5-prep`
+
+## Current state
+
+**UNVERIFIED.** Percent-complete and working/broken status cannot be derived from
+the repo alone. Do not write a number here you have not proven. Read the code, run
+the build, then record what you observed and how you observed it.
+
+## Exact next steps
+
+**UNVERIFIED.** Fill in on first real session in this repo.
+
+## Open decisions
+
+**UNVERIFIED.**
+
+## Rules
+
+- Repos span TWO namespaces: user `Kariimc` AND org `shift9-studio`. Enumerate with
+  `gh api '/user/repos?affiliation=owner,collaborator,organization_member'`, never
+  `gh repo list Kariimc` alone. See `Kariimc/my-skills` `rules/10-repo-topology.md`.
+- Never assert an absence, status, or completion without proving your scope was exhaustive.
+- Update this file in the same commit as any code change. A global pre-commit hook enforces it.
