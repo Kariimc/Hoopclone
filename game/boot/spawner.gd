@@ -193,15 +193,30 @@ const AWAY_SPOTS := [
 ## whole difference between a set defence and five players in a heap. They ARE
 ## registered on the shot, so the contest model sees every one of them and a shot
 ## taken into a crowd is properly punished.
+## Fill the floor out to five a side around the controlled player and the on-ball
+## defender that already exist.
+##
+## The attacking four are Teammates: they hold a shape and drift inside it, with
+## the occasional cut to the rim. The defending four are real Defenders, and each
+## is ASSIGNED a man - one of the attacking four - so the defence tracks the
+## offence instead of five bodies chasing one ball. All of them are registered on
+## the shot, so the contest model sees the whole defence and a shot taken into a
+## crowd is properly punished.
 func spawn_team_mates(root: Node3D, player: Node3D, home: Array, away: Array,
 		home_team: String, away_team: String) -> void:
+	var rim := root.get_node_or_null("RightHoop") as Node3D
+
+	var mates: Array[Teammate] = []
 	for i in HOME_SPOTS.size():
-		var mate := Defender.new()          # a body that holds position; no man assigned
+		var mate := Teammate.new()
 		mate.name = "Home_%d" % i
 		mate.attributes = _attrs_for(home, i + 1)
 		root.add_child(mate)
 		mate.global_position = HOME_SPOTS[i]
+		mate.setup(HOME_SPOTS[i], rim)
 		_dress(root, mate, home_team)
+		var driver := _play_clip(_body_of(mate), mate)
+		mates.append(mate)
 
 	var opponents: Array[Defender] = []
 	for i in AWAY_SPOTS.size():
@@ -210,7 +225,13 @@ func spawn_team_mates(root: Node3D, player: Node3D, home: Array, away: Array,
 		opp.attributes = _attrs_for(away, i + 1)
 		root.add_child(opp)
 		opp.global_position = AWAY_SPOTS[i]
+		# Each defender takes the teammate at the same index. With equal counts
+		# that is a clean man-to-man; if the counts ever differ it wraps rather
+		# than leaving anyone unguarded.
+		if mates.size() > 0 and rim != null:
+			opp.assign(mates[i % mates.size()], rim)
 		_dress(root, opp, away_team)
+		_play_clip(_body_of(opp), opp)
 		opponents.append(opp)
 
 	if player is Player and (player as Player).shot != null:
@@ -219,9 +240,17 @@ func spawn_team_mates(root: Node3D, player: Node3D, home: Array, away: Array,
 		all.append_array(shot.defenders)
 		all.append_array(opponents)
 		shot.set_defenders(all)
-		print("Teams on the floor: 5 %s vs 5 %s (%d contesting)" % [home_team, away_team, all.size()])
+		print("Teams on the floor: 5 %s vs 5 %s (%d contesting, %d marking a man)"
+			% [home_team, away_team, all.size(), opponents.size()])
 	else:
 		push_warning("Team mates spawned but the shot is not equipped - shots will be uncontested.")
+
+## The dressed model hanging off a body, so its clips can be driven.
+func _body_of(host: Node3D) -> Node:
+	for c in host.get_children():
+		if c is Node3D and String(c.name).begins_with("body_"):
+			return c
+	return host
 
 ## Attributes for the nth player of a roster, or league-average if the roster is
 ## short, so a thin roster still fields five bodies.

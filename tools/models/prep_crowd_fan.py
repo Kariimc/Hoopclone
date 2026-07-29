@@ -61,6 +61,45 @@ for v in obj.data.vertices:
     v.co.x -= mid_x
     v.co.y -= mid_y
     v.co.z -= lo.z
+
+# Face the model FORWARD (-Y in Blender, which becomes -Z in Godot) before doing
+# anything else. A generated model arrives pointing wherever the generator felt
+# like, and the crowd placement code cannot know that - the first build seated
+# 688 people sideways to the court.
+#
+# Found geometrically rather than guessed: a seated person's shins and feet stick
+# out in front of the body, so the direction from the body's centre to the
+# centroid of its LOWEST slice is forward.
+import math
+zs = [v.co.z for v in obj.data.vertices]
+floor_cut = min(zs) + (max(zs) - min(zs)) * 0.18
+low = [v.co for v in obj.data.vertices if v.co.z <= floor_cut]
+if low:
+    fx = sum(c.x for c in low) / len(low)
+    fy = sum(c.y for c in low) / len(low)
+    forward = Vector((fx, fy, 0.0))
+    if forward.length > 1e-4:
+        forward.normalize()
+        # Rotate about Z so `forward` lands on -Y.
+        yaw = math.atan2(forward.x, -forward.y)
+        c, s = math.cos(-yaw), math.sin(-yaw)
+        for v in obj.data.vertices:
+            x, y = v.co.x, v.co.y
+            v.co.x = x * c - y * s
+            v.co.y = x * s + y * c
+        print("FAN: forward was (%.3f, %.3f); rotated %.1f degrees to face -Y"
+              % (forward.x, forward.y, math.degrees(-yaw)))
+    else:
+        print("FAN: could not read a forward direction; left unrotated")
+
+# Bounds changed after rotating, so re-measure everything the tagging depends on.
+lo = Vector((min(v.co.x for v in obj.data.vertices),
+             min(v.co.y for v in obj.data.vertices),
+             min(v.co.z for v in obj.data.vertices)))
+hi = Vector((max(v.co.x for v in obj.data.vertices),
+             max(v.co.y for v in obj.data.vertices),
+             max(v.co.z for v in obj.data.vertices)))
+size = hi - lo
 height = size.z
 half_w = max(1e-6, size.x * 0.5)
 
@@ -104,6 +143,21 @@ for img in bpy.data.images:
         w = img.size[0]
         img.scale(TEX, TEX)
         print("FAN: texture %s %d -> %d" % (img.name, w, TEX))
+
+albedo_out = os.path.splitext(OUT)[0] + "_albedo.png"
+saved = False
+for mat in obj.data.materials:
+    if mat and mat.node_tree:
+        for n in mat.node_tree.nodes:
+            if n.type == 'TEX_IMAGE' and n.image and "Color" in n.image.name:
+                n.image.filepath_raw = albedo_out
+                n.image.file_format = 'PNG'
+                n.image.save()
+                saved = True
+                print("FAN: albedo written to %s" % albedo_out)
+                break
+if not saved:
+    print("FAN: WARN no colour texture found to write out")
 
 bpy.ops.object.select_all(action='DESELECT')
 obj.select_set(True)

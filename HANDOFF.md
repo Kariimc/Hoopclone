@@ -404,6 +404,44 @@ with the measured numbers behind it.
 
 Meshy rigging (3d_rigging via Higgsfield) FAILED server-side on a 20k-face,
 4K-texture body. Not retried. If it is wanted later, try a decimated body first.
+### Session 2026-07-29, part 12 - two bugs that hid every generated asset
+
+The owner reported the crowd looked like untextured mannequins sitting the wrong
+way, and that nothing from the asset generation was visible. Both were real.
+
+1. **Facing.** A generated model arrives pointing wherever the generator felt
+   like - this one was 93.5 degrees off - and the placement code cannot know
+   that, so 688 people sat sideways to the court. `prep_crowd_fan.py` now finds
+   forward GEOMETRICALLY (a seated person's shins and feet stick out in front, so
+   the direction from the body centre to the centroid of its lowest slice is
+   forward) and rotates the mesh to face -Y before anything else. Bounds are
+   re-measured after the rotation because the part tagging depends on them.
+2. **Texture.** Reading the albedo back off the imported glTF material in Godot
+   returned nothing, so `has_tex` stayed 0 and the whole crowd rendered flat.
+   The prep script now writes the colour map out as its own PNG beside the model
+   and CrowdFans loads it BY PATH.
+
+Lesson for every future generated asset: never trust its orientation, and never
+rely on pulling a texture back out of an imported glTF material - export the map
+alongside and load it explicitly.
+
+### Council verdict on what "AAA" actually means here (2026-07-29)
+
+Three challenger voices plus a synthesiser, all independent. Unanimous: the gap
+is NOT fidelity. The arena is already past the bar. Ranked, with status:
+
+1. Broadcast HUD - score, game clock, shot clock. MISSING.
+2. Sound - dribble, sneakers, rim, net, crowd bed. MISSING ENTIRELY.
+3. Ball lives in the hand. BROKEN - it is a separate object that does not follow.
+4. Consequence - possession change, out of bounds, rebounds, fouls. MISSING.
+5. Motion continuity - blended locomotion. BROKEN, clips snap.
+6. Presentation reactions - crowd swell, replay. MISSING.
+7. Environment fidelity. ALREADY STRONG - stop polishing it.
+8. Unique faces per player. Do NOT fund - invisible at broadcast distance.
+
+The dissent worth keeping: the owner's eye is a biased instrument. The floating
+ball and the clip snapping only show in MOTION, so work must be shown to him
+running and with sound, not as a still.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

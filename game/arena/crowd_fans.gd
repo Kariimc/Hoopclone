@@ -29,6 +29,11 @@ const INNER_Z := 13.2
 const ROW_STEP := 1.25            ## each row sits further out
 const ROW_RISE := 0.62            ## and higher, like raked seating
 const FAN_MESH := "res://assets/models/crowd_fan.glb"
+## The spectator's colour map, written out beside the model by
+## tools/models/prep_crowd_fan.py. It is loaded BY PATH rather than dug out of
+## the imported glTF material, because that lookup kept returning nothing and the
+## whole crowd rendered as flat mannequins with none of the photographed detail.
+const FAN_ALBEDO := "res://assets/models/crowd_fan_albedo.png"
 const FAN_SCALE_MIN := 0.92
 const FAN_SCALE_MAX := 1.08
 
@@ -183,10 +188,14 @@ func _fan_mesh() -> Mesh:
 	var packed: PackedScene = load(FAN_MESH)
 	var scene: Node = packed.instantiate()
 	var found := _first_mesh(scene)
-	if found != null and found.get_surface_count() > 0:
+	if ResourceLoader.exists(FAN_ALBEDO):
+		_fan_tex = load(FAN_ALBEDO) as Texture2D
+	elif found != null and found.get_surface_count() > 0:
 		var src := found.surface_get_material(0) as BaseMaterial3D
 		if src != null:
 			_fan_tex = src.albedo_texture
+	if _fan_tex == null:
+		push_warning("CrowdFans: no colour map; the crowd will render flat")
 	scene.queue_free()
 	return found
 
