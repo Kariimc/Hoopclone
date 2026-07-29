@@ -9,9 +9,14 @@ class_name CrowdFans
 ## a fan, so hundreds of them cost about as much as a single object. Animating
 ## them as individual nodes would not survive the frame budget.
 ##
-## Every fan carries a per-instance seed (fed in as instance colour) that offsets
-## its idle rhythm, its build, its shirt colour and how eagerly it reacts, so no
-## two move together and the rows never read as a repeating pattern.
+## The body is a modelled seated spectator (assets/models/crowd_fan.glb, built by
+## tools/models/build_fan.py in headless Blender - 456 triangles, watertight).
+## Its second UV channel tags every vertex with which body part it belongs to,
+## which is what lets one vertex shader sit them, sway them and stand them up.
+##
+## Every fan carries a per-instance seed (fed in as instance custom data) that
+## offsets its idle rhythm, its build, its skin tone and how eagerly it reacts, so
+## no two move together and the rows never read as a repeating pattern.
 ##
 ## Reactions ride on the same 0-1 intensity dial the photo bowl uses, so a made
 ## basket already lifts them - see CrowdBowl.set_intensity.
@@ -23,6 +28,7 @@ const INNER_X := 21.0             ## clears the 28m court AND both hoop stanchio
 const INNER_Z := 13.2
 const ROW_STEP := 1.25            ## each row sits further out
 const ROW_RISE := 0.62            ## and higher, like raked seating
+const FAN_MESH := "res://assets/models/crowd_fan.glb"
 const FAN_SCALE_MIN := 0.92
 const FAN_SCALE_MAX := 1.08
 
@@ -41,40 +47,51 @@ render_mode cull_disabled;
 
 uniform float intensity : hint_range(0.0, 1.0) = 0.25;
 
-// UV2.x tags what a vertex belongs to: 0 = seated lower body (never moves),
-// 1 = upper body, 2 = arms. UV2.y is how far up that part the vertex sits,
-// so bending pivots from the right place instead of shearing the whole mesh.
+// UV2.x says which body part a vertex belongs to - 0 legs, 1 torso, 2 arms,
+// 3 head - and UV2.y how far up that part it sits, so bends pivot from the right
+// place instead of shearing the whole body. The tags are baked into the model.
+varying float v_part;
+varying vec3 v_skin;
+varying vec3 v_trousers;
+
 void vertex() {
 	float part = UV2.x;
 	float up = UV2.y;
+	v_part = part;
 
-	// INSTANCE_CUSTOM carries the per-fan seed written at build time.
 	float seed = INSTANCE_CUSTOM.r;
-	float eager = INSTANCE_CUSTOM.g;          // how strongly this fan reacts
+	float eager = INSTANCE_CUSTOM.g;
+	float skin_t = INSTANCE_CUSTOM.b;
 	float phase = seed * 6.2831;
 
-	// Idle: a slow shift of weight, always present, never synchronised.
-	float idle = sin(TIME * (0.7 + seed * 0.5) + phase);
-	VERTEX.x += idle * 0.018 * up * step(0.5, part);
-	VERTEX.z += cos(TIME * (0.5 + seed * 0.4) + phase) * 0.012 * up * step(0.5, part);
+	// Skin runs from fair to deep; trousers are a darkened, desaturated take on
+	// the shirt so an outfit still reads as one person.
+	v_skin = mix(vec3(0.86, 0.68, 0.55), vec3(0.28, 0.17, 0.11), skin_t);
+	v_trousers = mix(COLOR.rgb * 0.35, vec3(0.16, 0.17, 0.20), 0.55);
 
-	// Reaction: rise out of the seat and throw the arms up. Each fan reacts on
-	// its own slight delay so the wave spreads through the rows.
+	float moves = step(0.5, part);
+
+	// Idle: a slow shift of weight, always present, never synchronised.
+	VERTEX.x += sin(TIME * (0.7 + seed * 0.5) + phase) * 0.018 * up * moves;
+	VERTEX.z += cos(TIME * (0.5 + seed * 0.4) + phase) * 0.012 * up * moves;
+
+	// Reaction: rise out of the seat and throw the arms up, each fan on its own
+	// slight delay so the wave spreads through the rows.
 	float react = clamp((intensity - seed * 0.35) * 1.6, 0.0, 1.0) * eager;
 	float bounce = max(sin(TIME * 6.0 + phase), 0.0) * react;
+	VERTEX.y += (react * 0.34 + bounce * 0.07) * moves;
 
-	VERTEX.y += react * 0.34 * step(0.5, part) + bounce * 0.07 * step(0.5, part);
-
-	if (part > 1.5) {
-		// Arms swing up and outward as the fan celebrates.
-		float lift = react * 0.55 + bounce * 0.16;
-		VERTEX.y += lift;
+	if (part > 1.5 && part < 2.5) {
+		VERTEX.y += react * 0.55 + bounce * 0.16;
 		VERTEX.x += sign(VERTEX.x) * react * 0.10;
 	}
 }
 
 void fragment() {
-	ALBEDO = COLOR.rgb;
+	vec3 albedo = COLOR.rgb;                 // shirt
+	if (v_part < 0.5) albedo = v_trousers;   // legs
+	if (v_part > 1.5) albedo = v_skin;       // arms and head
+	ALBEDO = albedo;
 	ROUGHNESS = 0.85;
 	SPECULAR = 0.15;
 }
@@ -96,6 +113,9 @@ func build(root: Node3D) -> void:
 	mm.use_colors = true
 	mm.use_custom_data = true
 	mm.mesh = _fan_mesh()
+	if mm.mesh == null:
+		push_warning("CrowdFans: no fan mesh; crowd not built")
+		return
 	mm.instance_count = ROWS * PER_ROW
 
 	var rng := RandomNumberGenerator.new()
@@ -117,8 +137,8 @@ func build(root: Node3D) -> void:
 
 			var shirt: Color = SHIRT_COLORS[rng.randi_range(0, SHIRT_COLORS.size() - 1)]
 			mm.set_instance_color(i, shirt.lerp(Color(0.5, 0.5, 0.55), rng.randf() * 0.25))
-			# r = rhythm/threshold seed, g = how eagerly this fan reacts.
-			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf_range(0.55, 1.0), 0.0, 0.0))
+			# r = rhythm/threshold seed, g = eagerness, b = skin tone.
+			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf_range(0.55, 1.0), rng.randf(), 0.0))
 			i += 1
 
 	var node := MultiMeshInstance3D.new()
@@ -136,39 +156,24 @@ func set_intensity(v: float) -> void:
 	if _fan_mat != null:
 		_fan_mat.set_shader_parameter("intensity", clampf(v, 0.0, 1.0))
 
-## One seated spectator, built once and instanced everywhere. Deliberately blocky
-## - at broadcast distance a fan is a few dozen pixels, and silhouette plus colour
-## is all that reads. UV2 tags each part for the vertex shader (see FAN_SHADER).
-func _fan_mesh() -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+## The modelled seated spectator, pulled out of its glTF. Built once, instanced
+## everywhere. Deliberately low - at broadcast distance a fan is a few dozen
+## pixels, so silhouette and colour are all that read.
+func _fan_mesh() -> Mesh:
+	if not ResourceLoader.exists(FAN_MESH):
+		push_warning("CrowdFans: %s missing - rebuild it with tools/models/build_fan.py" % FAN_MESH)
+		return null
+	var packed: PackedScene = load(FAN_MESH)
+	var scene: Node = packed.instantiate()
+	var found := _first_mesh(scene)
+	scene.queue_free()
+	return found
 
-	# part 0 = seated legs, 1 = torso/head, 2 = arms
-	_box(st, Vector3(0.0, 0.18, 0.14), Vector3(0.34, 0.16, 0.42), 0.0, 0.0)   # thighs
-	_box(st, Vector3(0.0, 0.09, 0.34), Vector3(0.30, 0.30, 0.14), 0.0, 0.0)   # shins
-	_box(st, Vector3(0.0, 0.52, 0.0), Vector3(0.36, 0.46, 0.24), 1.0, 0.6)    # torso
-	_box(st, Vector3(0.0, 0.83, 0.0), Vector3(0.20, 0.20, 0.20), 1.0, 1.0)    # head
-	_box(st, Vector3(-0.24, 0.52, 0.0), Vector3(0.11, 0.40, 0.14), 2.0, 0.9)  # left arm
-	_box(st, Vector3(0.24, 0.52, 0.0), Vector3(0.11, 0.40, 0.14), 2.0, 0.9)   # right arm
-
-	st.generate_normals()
-	return st.commit()
-
-## Append an axis-aligned box, tagging every vertex with (part, height) in UV2.
-func _box(st: SurfaceTool, center: Vector3, size: Vector3, part: float, up: float) -> void:
-	var h := size * 0.5
-	var corners := [
-		center + Vector3(-h.x, -h.y, -h.z), center + Vector3(h.x, -h.y, -h.z),
-		center + Vector3(h.x, h.y, -h.z), center + Vector3(-h.x, h.y, -h.z),
-		center + Vector3(-h.x, -h.y, h.z), center + Vector3(h.x, -h.y, h.z),
-		center + Vector3(h.x, h.y, h.z), center + Vector3(-h.x, h.y, h.z),
-	]
-	var faces := [
-		[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
-		[1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0],
-	]
-	for f in faces:
-		for tri in [[0, 1, 2], [0, 2, 3]]:
-			for k in tri:
-				st.set_uv2(Vector2(part, up))
-				st.add_vertex(corners[f[k]])
+func _first_mesh(n: Node) -> Mesh:
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		return (n as MeshInstance3D).mesh
+	for c in n.get_children():
+		var m := _first_mesh(c)
+		if m != null:
+			return m
+	return null

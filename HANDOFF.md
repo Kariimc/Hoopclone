@@ -133,6 +133,38 @@ downloads, and named the `3d-master-modeler` skill - which routes engine assets
 through headless Blender; `bpy` is NOT installed on this laptop). Then 5-on-5,
 then the possession loop.
 
+### Session 2026-07-29, part 4 - modelled crowd
+
+Ran the `3d-master-modeler` skill properly (run card at
+`tools/models/RUNCARD-crowd-fan.md`, all eight rows filled).
+
+- **Blender 5.2 is ALREADY INSTALLED** at `C:\Program Files\Blender Foundation\
+  Blender 5.2` and runs headless (`blender.exe --background --factory-startup
+  --python <script>`, Python 3.13.13). Do not try `pip install bpy` on this
+  laptop - no wheel exists for its Python 3.12, and the attempt wastes minutes.
+- The laptop's network is **fully open**: blender.org, download.blender.org and
+  the Poly Haven API all answered 200. Real CC0 photographed PBR sets and HDRIs
+  are available for the court, courtside and props whenever wanted.
+- `tools/models/build_fan.py` builds the seated spectator and is the only way the
+  asset should ever change - regenerate, never hand-edit the GLB. 456 triangles,
+  zero non-manifold edges, 24 KB.
+- The mesh's **second UV channel carries the animation tags** (0 legs, 1 torso,
+  2 arms, 3 head; V = height up that part). The Godot vertex shader reads them to
+  sit, sway and stand the fans. Any replacement mesh MUST carry the same tags or
+  the crowd stops animating.
+- Godot colours each fan itself: shirt from instance colour, trousers a darkened
+  take on it, skin from a per-instance tone. No textures on the crowd at all.
+
+**Blender gotcha (cost one pass):** a UV loop element is a `BMLoopUV` on some
+builds and a plain `Vector` on others - `l[uv][:] = ...` throws
+`'BMLoopUV' object does not support item assignment`. The build script handles
+both. **Modelling gotcha (cost one pass):** build figures facing **-Y**; +Y means
+every render and the engine sees the back of the model.
+
+**Next:** the defender is still a blue capsule, the court is ringed by a wide
+empty dark band, and there is still no score or clock. 5-on-5 and the possession
+loop remain the two big pieces.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
