@@ -32,17 +32,43 @@ provable from the repo alone - fill them in, do not guess.
 
 ## Current state
 
-**UNVERIFIED.** Percent-complete and working/broken status cannot be derived from
-the repo alone. Do not write a number here you have not proven. Read the code, run
-the build, then record what you observed and how you observed it.
+**Session 2026-07-29 (laptop, Claude Code).** Verified by running the commands,
+not inferred:
+
+- The project now opens on **Godot 4.7** (it was authored against 4.3). Opening
+  it rewrote every `.import` sidecar and generated the `.uid` files Godot 4.4+
+  expects. That churn is committed on its own as a `chore:` commit so it never
+  gets confused with behavior changes.
+- **Godot MCP Pro v1.15.1** (paid) is installed into this project and registered
+  globally for every Claude Code session on this laptop, so any session gets the
+  editor bridge without a per-folder setup step. The addon itself and `.mcp.json`
+  are **gitignored** - this repo is public and the addon is paid software.
+  Reinstall it from the purchased zip on any other machine.
+- **PROGRESS.md Sprint 5 step 1f is done** (`GameState` is now an autoload the
+  scorebug and ticker actually read). Proven green: engine self-test 12/12,
+  revert-to-red on the new same-phase guard, and an error-free headless boot of
+  `main.tscn` that reports phase `LIVE`.
+
+Everything else in PROGRESS.md is unchanged - that file, not this one, is the
+authoritative checklist.
 
 ## Exact next steps
 
-**UNVERIFIED.** Fill in on first real session in this repo.
+1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
+   hydrates the boot player. PROGRESS.md notes this can wait until step 4 if the
+   possession loop stays pure-data, which the audit recommends.
+2. **PROGRESS.md step 2** - the possession loop (`tools/sim/possession.py`),
+   headless-runnable, seeded RNG. This is the next real feature-shaped work.
 
 ## Open decisions
 
-**UNVERIFIED.**
+- **Gotcha, already cost one debug cycle:** calling `GameState.set_phase()` by
+  the bare autoload name is a *parse* error ("Cannot call non-static function
+  ... directly") - the parser resolves the bare name to the script, not to the
+  instance. Reach the singleton with `get_node("/root/GameState")` and preload
+  the script only so the `Phase` enum resolves. All three callers use that shape.
+- The `missed` signal semantics decision in PROGRESS.md step 1c stays locked -
+  do not re-litigate it once a rebound system consumes the signal.
 
 ## Rules
 

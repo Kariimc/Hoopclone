@@ -7,6 +7,8 @@ class_name Scorebug
 @export var service_url: String = "http://127.0.0.1:8777/scores"
 @export var poll_seconds: float = 3.0
 
+const GameStateScript := preload("res://game/core/game_state.gd")
+
 @onready var _http: HTTPRequest = HTTPRequest.new()
 var _timer: float = 0.0
 
@@ -19,7 +21,20 @@ func _process(delta: float) -> void:
 	_timer += delta
 	if _timer >= poll_seconds:
 		_timer = 0.0
-		_request()
+		if _game_running():
+			_request()
+
+## Polling only makes sense while a game is actually being played. Before tip-off
+## and after the buzzer the numbers cannot change, so stop hitting the service.
+func _game_running() -> bool:
+	var gs := get_node_or_null("/root/GameState")
+	if gs == null:
+		return true # scene opened on its own, no autoload — behave as before
+	return gs.phase not in [
+		GameStateScript.Phase.BOOT,
+		GameStateScript.Phase.MENU,
+		GameStateScript.Phase.FINAL,
+	]
 
 func _request() -> void:
 	if _http.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:

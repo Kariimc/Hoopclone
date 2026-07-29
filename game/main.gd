@@ -10,14 +10,17 @@ extends Node3D
 ## Team kit the boot player wears (key in assets/team_manifest.json: CRW/STM/BAY).
 @export var player_team: String = "CRW"
 
+## The shared phase tracker lives as the "GameState" autoload; this preload is
+## only here so the Phase names resolve at parse time.
+const GameStateScript := preload("res://game/core/game_state.gd")
+
 var _crowd := CrowdBowl.new()
 var _arena := ArenaBuilder.new()
 var _spawner := Spawner.new()
 
 func _ready() -> void:
-	var gs := GameState.new()
-	add_child(gs)
-	gs.set_phase(GameState.Phase.LIVE)
+	var gs := get_node("/root/GameState")
+	gs.set_phase(GameStateScript.Phase.LIVE)
 
 	var roster := _load_roster(roster_json)
 	if roster.size() > 0:

@@ -10,6 +10,7 @@ extends SceneTree
 
 const ContestModel := preload("res://game/core/contest_model.gd")
 const ShotModel := preload("res://game/core/shot_model.gd")
+const GameStateScript := preload("res://game/core/game_state.gd")
 
 var _fails := 0
 
@@ -48,6 +49,24 @@ func _initialize() -> void:
 	_check("shot: probability within [P_MIN, P_MAX]",
 		open_p >= ShotModel.P_MIN and open_p <= ShotModel.P_MAX)
 
+	# --- GameState (Sprint 5 step 1f): the shared phase every consumer reads ---
+	var gs := GameStateScript.new()
+	_check("gamestate: starts in BOOT", gs.phase == GameStateScript.Phase.BOOT)
+	_check("gamestate: phase_name matches phase", gs.phase_name() == "BOOT")
+
+	var seen: Array = []
+	gs.phase_changed.connect(func(from, to): seen.append([from, to]))
+
+	gs.set_phase(GameStateScript.Phase.LIVE)
+	_check("gamestate: set_phase moves the phase", gs.phase == GameStateScript.Phase.LIVE)
+	_check("gamestate: set_phase announces the change",
+		seen.size() == 1
+		and seen[0][0] == GameStateScript.Phase.BOOT
+		and seen[0][1] == GameStateScript.Phase.LIVE)
+
+	gs.set_phase(GameStateScript.Phase.LIVE)
+	_check("gamestate: re-setting the same phase announces nothing", seen.size() == 1)
+	gs.free()
 	if _fails == 0:
 		print("ALL GODOT TESTS PASSED")
 	else:
