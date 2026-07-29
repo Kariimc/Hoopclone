@@ -180,11 +180,28 @@ if hits:
     print("BALL: matched cluster spans %.3f x %.3f x %.3f m (a real ball is ~0.24)"
           % (size.x, size.y, size.z))
 
+# --- stray geometry ---
+# The mesh ships with a few faces whose vertices sit nowhere near each other.
+# Standing still they are invisible; the moment the rig moves, one end follows a
+# bone and the face stretches into a long shard across the body. A real human
+# mesh at this scale has no face longer than a hand span, so anything above the
+# threshold is broken geometry, not anatomy.
+LONG_EDGE = float(cli("--max-edge", "0.22"))
+strays = []
+for poly in me.polygons:
+    vs = [mw @ me.vertices[i].co for i in poly.vertices]
+    longest = 0.0
+    for i in range(len(vs)):
+        longest = max(longest, (vs[i] - vs[(i + 1) % len(vs)]).length)
+    if longest > LONG_EDGE:
+        strays.append(poly.index)
+print("BALL: %d stray faces with an edge longer than %.2f m" % (len(strays), LONG_EDGE))
+
 if DRY:
     print("BALL: dry run - nothing deleted")
 else:
     bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
-    doomed = [bm.faces[i] for i in hits]
+    doomed = [bm.faces[i] for i in sorted(set(hits) | set(strays))]
     bmesh.ops.delete(bm, geom=doomed, context='FACES')
     bm.to_mesh(me); bm.free()
     print("BALL: deleted %d faces; mesh now %d polys" % (len(hits), len(me.polygons)))

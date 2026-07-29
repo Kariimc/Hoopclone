@@ -44,10 +44,8 @@ IN_PLACE = cli("--in-place", "1") == "1"
 
 # CMU bone -> player-rig bone. Limbs match by name; spine and neck do not.
 MAP = {
-    "LeftUpLeg": "LeftUpLeg", "LeftLeg": "LeftLeg", "LeftFoot": "LeftFoot",
-    "LeftToeBase": "LeftToeBase",
-    "RightUpLeg": "RightUpLeg", "RightLeg": "RightLeg", "RightFoot": "RightFoot",
-    "RightToeBase": "RightToeBase",
+    "LeftUpLeg": "LeftUpLeg", "LeftLeg": "LeftLeg",
+    "RightUpLeg": "RightUpLeg", "RightLeg": "RightLeg",
     "LowerBack": "Spine02", "Spine": "Spine01", "Spine1": "Spine",
     "Neck1": "neck", "Head": "Head",
     "LeftArm": "LeftArm", "LeftForeArm": "LeftForeArm", "LeftHand": "LeftHand",
@@ -61,8 +59,15 @@ MAP = {
 ORDER = ["LowerBack", "Spine", "Spine1", "Neck1", "Head",
          "LeftArm", "LeftForeArm", "LeftHand",
          "RightArm", "RightForeArm", "RightHand",
-         "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase",
-         "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase"]
+         "LeftUpLeg", "LeftLeg",
+         "RightUpLeg", "RightLeg"]
+# Feet and toes are deliberately NOT retargeted, for the same reason as the
+# collarbones: the two skeletons hold them at completely different rest angles,
+# and aiming them by direction threw the foot 57 units out from the body - the
+# stretched shoe read as a long blade sweeping across the player and survived
+# five separate attempts to fix it as a mesh or skinning fault. Left at rest the
+# ankle stays neutral while the shin carries the motion, which reads correctly at
+# any distance the camera actually uses.
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene

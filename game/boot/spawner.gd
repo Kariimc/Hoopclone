@@ -103,6 +103,19 @@ func equip_player_shot(root: Node3D, player: Node3D, on_made: Callable) -> void:
 	ball.global_position = player.global_position + Vector3(0.0, 1.0, 0.0)
 	(player as Player).equip(ball, rim)
 	ball.made.connect(on_made)
+
+	# Put it in his hand. A ball hanging in space beside a player is the single
+	# most obvious tell that this is not basketball - everyone has muscle memory
+	# for hand-on-ball contact.
+	var hand := _hand_socket(player)
+	if hand != null:
+		ball.hold(hand, player)
+		# Once a shot resolves, the handler gets it back. A real possession loop
+		# replaces this, but a ball that never returns is worse than one that does.
+		ball.made.connect(func(): _return_ball(ball, player))
+		ball.missed.connect(func(): _return_ball(ball, player))
+	else:
+		push_warning("Spawner: no hand socket found; the ball will float")
 	print("Player equipped: ball + RightHoop. Hold 'shoot' to fire.")
 
 ## Sprint 5: an on-ball defender that marks the player and protects the right
@@ -314,3 +327,48 @@ func _ball_visual() -> Node3D:
 		mat.normal_texture = load(normal) as Texture2D
 	mesh.material_override = mat
 	return mesh
+
+## A node that follows the handler's ball hand, created once per body.
+##
+## The ball is carried in the LEFT hand on this model - that was measured, not
+## assumed: the welded practice ball that shipped with the mesh sat in LeftHand.
+const BALL_HAND_BONE := "LeftHand"
+
+func _hand_socket(body: Node3D) -> Node3D:
+	var existing := body.get_node_or_null("BallHand")
+	if existing != null:
+		return existing
+	var skel := _find_skeleton(body)
+	if skel == null:
+		return null
+	var idx := skel.find_bone(BALL_HAND_BONE)
+	if idx < 0:
+		push_warning("Spawner: no bone '%s' on this rig" % BALL_HAND_BONE)
+		return null
+	var att := BoneAttachment3D.new()
+	att.name = "BallHand"
+	skel.add_child(att)
+	att.bone_idx = idx
+	# Named on the body too, so a second call finds it instead of making another.
+	var alias := RemoteTransform3D.new()
+	alias.name = "BallHand"
+	body.add_child(alias)
+	alias.remote_path = alias.get_path_to(att)
+	return att
+
+func _find_skeleton(n: Node) -> Skeleton3D:
+	if n is Skeleton3D:
+		return n
+	for c in n.get_children():
+		var r := _find_skeleton(c)
+		if r != null:
+			return r
+	return null
+
+## Give the ball back to the handler after a shot resolves.
+func _return_ball(ball: Ball, player: Node3D) -> void:
+	var hand := player.get_node_or_null("BallHand")
+	if hand == null:
+		hand = _hand_socket(player)
+	if hand != null:
+		ball.hold(hand, player)

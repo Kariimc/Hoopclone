@@ -442,6 +442,53 @@ is NOT fidelity. The arena is already past the bar. Ranked, with status:
 The dissent worth keeping: the owner's eye is a biased instrument. The floating
 ball and the clip snapping only show in MOTION, so work must be shown to him
 running and with sound, not as a still.
+### Session 2026-07-29, part 13 - the "unnatural mesh", and how badly I chased it
+
+The owner reported the players looked "crazy and unnatural": a long blue blade
+sweeping across the body whenever they moved. Finding it took SIX wrong theories
+and they are all written down here so nobody repeats them.
+
+Wrong theories, in order:
+1. Broken faces in the rest mesh - measured, zero found. The faces are all normal
+   sized at rest; only posing breaks them.
+2. Bad skin weights, checking each vertex's DOMINANT bone - reported a clean
+   mesh. The dominant binding IS correct; the fault is a minor influence.
+3. Culling faces that get long when posed, by absolute length - loose thresholds
+   left the blade, tight ones ate the shorts hem and punched holes in him.
+4. Culling by stretch RATIO (posed length / rest length) - better, still left it.
+5. A stray 2-metre Icosphere with no material found riding inside the model.
+   Real, removed (`tools/models/strip_stray_objects.py`), but NOT the blade.
+6. Retargeting flinging the left foot 57 units sideways. Also real, also fixed
+   (feet and toes are now left at rest like the collarbones) - but not the blade.
+
+**The actual cause, and the reason my own test kept lying:** ~350 shorts vertices
+at hip height carry a full-weight binding to the **RightHand** bone. When the
+hand moves they are hauled to shoulder height, and the stretched shorts are the
+blade.
+
+My weight check missed it five times because it measured distance to the bone's
+LENGTH (head->tail segment). **This rig's tail data is garbage** - bones report
+lengths of 2,000-3,000 units on a 170-unit body - so every bone reads as an
+enormous rod passing near everything, and every vertex measures "close".
+`fix_weights.py` now measures to the JOINT position only, which is trustworthy.
+
+**Settings that work** (anything more aggressive breaks the arms - verified):
+
+    fix_weights.py --max-frac 0.16 --bones "LeftHand,RightHand,LeftForeArm,RightForeArm,LeftFoot,RightFoot,LeftToeBase,RightToeBase"
+
+**Order matters:** the fix must be applied to `player_noball.glb`, the SOURCE the
+moveset is built from. Applying it to `player_animated.glb` is thrown away the
+next time the moveset is rebuilt - that cost a full debugging cycle.
+
+**Pipeline, in order:** strip_ball -> fix_weights -> build_moveset ->
+strip_stray_objects -> player_animated.glb.
+
+### The ball now lives in the hand
+
+A BoneAttachment3D follows the LeftHand bone; the ball rides it and pumps to the
+floor and back on a procedural beat that quickens with the handler's speed. It
+settles into the hand when he stops, releases automatically on a shot, and comes
+back to him when the shot resolves.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
