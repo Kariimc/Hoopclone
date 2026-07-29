@@ -23,3 +23,8 @@ venv/
 # of truth for every machine (cloud + laptop) — see docs/WORKFLOW.md.
 # Do NOT re-add ignore rules for assets/, or copies will drift out of sync again.
 # ---------------------------------------------------------------------------
+
+# Godot MCP Pro is PAID software and this repo is public — the addon and the
+# machine-specific bridge config stay local. Reinstall from the purchased zip.
+/addons/godot_mcp/
+/.mcp.json
