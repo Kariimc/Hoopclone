@@ -352,6 +352,35 @@ project, not Godot.
 Live-reload gotcha: the watcher only matched *.gd,*.tscn,*.tres,*.json, so
 regenerating a .glb did NOT restart the game and the window silently showed stale
 art. It now also watches glb/png/jpeg/bvh/import.
+### Session 2026-07-29, part 10 - premium generated assets, cut to budget
+
+The asset route is: generate at the HIGHEST quality setting, then cut it down.
+Generated assets arrive unusable for real time - the basketball came back at
+1,907,500 triangles and 55 MB - and the detail that actually reads at broadcast
+distance lives in the normal and colour maps, not in raw geometry.
+
+- assets/models/basketball.glb - 2,999 tris, 0.7 MB, 2K colour/normal/ORM.
+  Replaces the flat orange sphere. The old textured sphere stays as a fallback so
+  the scene never depends on the asset existing.
+- assets/models/crowd_fan.glb - a real seated person with a photographed texture,
+  1,400 tris, 0.13 MB. Replaces the hand-built blocky body.
+
+Reusable tools, both in tools/models/:
+- optimise_asset.py - decimate to a triangle target and downscale textures. Run
+  this on EVERY generated asset before it enters the project.
+- prep_crowd_fan.py - tags every vertex in a SECOND UV channel with which body
+  part it belongs to (0 legs, 1 torso, 2 arms, 3 head, plus height up that part).
+  A generated model has no idea what a limb is, and the crowd's vertex shader
+  needs those tags to sit, sway and stand the fans. ANY replacement crowd mesh
+  must go through this or the crowd stops animating.
+
+The crowd shader now samples the model's own texture and only TINTS the shirt per
+instance, so skin, hair and jeans keep what the photograph gave them. Tinting
+everything turned the stands into painted statues.
+
+Generation settings that matter: model tripo_3d (or tripo_h3_1_image_to_3d),
+texture_quality "detailed", geometry_quality "detailed", pbr true, auto_size true,
+and face_limit to cap the mesh at source. About 12.5 credits per asset.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

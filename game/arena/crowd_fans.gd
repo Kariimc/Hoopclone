@@ -46,6 +46,8 @@ shader_type spatial;
 render_mode cull_disabled;
 
 uniform float intensity : hint_range(0.0, 1.0) = 0.25;
+uniform sampler2D fan_tex : source_color, filter_linear_mipmap;
+uniform float has_tex = 0.0;
 
 // UV2.x says which body part a vertex belongs to - 0 legs, 1 torso, 2 arms,
 // 3 head - and UV2.y how far up that part it sits, so bends pivot from the right
@@ -88,9 +90,19 @@ void vertex() {
 }
 
 void fragment() {
-	vec3 albedo = COLOR.rgb;                 // shirt
-	if (v_part < 0.5) albedo = v_trousers;   // legs
-	if (v_part > 1.5) albedo = v_skin;       // arms and head
+	vec3 base = mix(COLOR.rgb, texture(fan_tex, UV).rgb, has_tex);
+
+	// Only the shirt takes the per-fan colour. Skin, hair and jeans keep what the
+	// photographed texture gave them, or the crowd turns into painted statues.
+	float is_torso = step(0.5, v_part) * step(v_part, 1.5);
+	vec3 shirt = mix(base, base * (COLOR.rgb * 1.7), is_torso * 0.55 * has_tex);
+
+	vec3 albedo = mix(base, shirt, has_tex);
+	if (has_tex < 0.5) {
+		albedo = COLOR.rgb;
+		if (v_part < 0.5) albedo = v_trousers;
+		if (v_part > 1.5) albedo = v_skin;
+	}
 	ALBEDO = albedo;
 	ROUGHNESS = 0.85;
 	SPECULAR = 0.15;
@@ -98,6 +110,7 @@ void fragment() {
 """
 
 var _fan_mat: ShaderMaterial
+var _fan_tex: Texture2D
 
 ## Build the seated rows around `root`. Safe to call once from _ready().
 func build(root: Node3D) -> void:
@@ -107,6 +120,10 @@ func build(root: Node3D) -> void:
 	mat.shader = shader
 	mat.set_shader_parameter("intensity", 0.25)
 	_fan_mat = mat
+
+	if _fan_tex != null:
+		mat.set_shader_parameter("fan_tex", _fan_tex)
+		mat.set_shader_parameter("has_tex", 1.0)
 
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -166,6 +183,10 @@ func _fan_mesh() -> Mesh:
 	var packed: PackedScene = load(FAN_MESH)
 	var scene: Node = packed.instantiate()
 	var found := _first_mesh(scene)
+	if found != null and found.get_surface_count() > 0:
+		var src := found.surface_get_material(0) as BaseMaterial3D
+		if src != null:
+			_fan_tex = src.albedo_texture
 	scene.queue_free()
 	return found
 

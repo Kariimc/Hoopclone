@@ -15,6 +15,11 @@ const PLAYER_MESH_FALLBACK := "res://assets/models/player_base.glb"
 ## state machine starts driving them properly.
 const DEFAULT_CLIP := "dribble"
 
+## The real ball. Generated at photoreal quality then cut down to a game budget
+## (3k triangles, 2K colour/normal/ORM maps, 0.7 MB) - all the detail that reads
+## at broadcast distance lives in the normal map, not in raw geometry.
+const BALL_MESH := "res://assets/models/basketball.glb"
+
 # Ball skin (the locked leather photo). Dropped in via ADD-ASSETS; orange fallback
 # until then. Albedo + optional derived normal map, any common image extension.
 const BALL_ALBEDO_CANDIDATES := [
@@ -92,24 +97,7 @@ func equip_player_shot(root: Node3D, player: Node3D, on_made: Callable) -> void:
 	var ball := Ball.new()
 	ball.name = "Ball"
 	root.add_child(ball)
-	var mesh := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.12
-	sphere.height = 0.24
-	mesh.mesh = sphere
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.40, 0.15)   # orange fallback until the leather photo is dropped in
-	var ball_albedo := _first_existing(BALL_ALBEDO_CANDIDATES)
-	if ball_albedo != "":
-		mat.albedo_texture = load(ball_albedo) as Texture2D
-		mat.albedo_color = Color.WHITE   # let the texture show its true colour
-		print("Ball albedo applied from %s" % ball_albedo)
-	var ball_normal := _first_existing(BALL_NORMAL_CANDIDATES)
-	if ball_normal != "":
-		mat.normal_enabled = true
-		mat.normal_texture = load(ball_normal) as Texture2D
-	mesh.material_override = mat
-	ball.add_child(mesh)
+	ball.add_child(_ball_visual())
 	ball.global_position = player.global_position + Vector3(0.0, 1.0, 0.0)
 	(player as Player).equip(ball, rim)
 	ball.made.connect(on_made)
@@ -272,3 +260,32 @@ func _find_anim_player(n: Node) -> AnimationPlayer:
 		if r != null:
 			return r
 	return null
+
+## The ball's body: the modelled basketball if it is present, otherwise the old
+## textured sphere, so the scene never depends on the asset existing.
+func _ball_visual() -> Node3D:
+	if ResourceLoader.exists(BALL_MESH):
+		var packed: PackedScene = load(BALL_MESH)
+		var inst: Node3D = packed.instantiate()
+		inst.name = "BallMesh"
+		print("Ball: modelled basketball from %s" % BALL_MESH)
+		return inst
+
+	var mesh := MeshInstance3D.new()
+	mesh.name = "BallMesh"
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.12
+	sphere.height = 0.24
+	mesh.mesh = sphere
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.85, 0.40, 0.15)
+	var albedo := _first_existing(BALL_ALBEDO_CANDIDATES)
+	if albedo != "":
+		mat.albedo_texture = load(albedo) as Texture2D
+		mat.albedo_color = Color.WHITE
+	var normal := _first_existing(BALL_NORMAL_CANDIDATES)
+	if normal != "":
+		mat.normal_enabled = true
+		mat.normal_texture = load(normal) as Texture2D
+	mesh.material_override = mat
+	return mesh
