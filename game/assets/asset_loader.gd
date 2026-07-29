@@ -23,8 +23,8 @@ func _load_manifest() -> Dictionary:
 	return data if typeof(data) == TYPE_DICTIONARY else {}
 
 ## Instance the base mesh and dress it in a team's kit. Returns the new node.
-func spawn_player(team_id: String, jersey_surface: String = "Jersey") -> Node3D:
-	var base_path: String = _manifest.get("base_mesh", "")
+func spawn_player(team_id: String, jersey_surface: String = "Jersey", mesh_path: String = "") -> Node3D:
+	var base_path: String = mesh_path if mesh_path != "" else String(_manifest.get("base_mesh", ""))
 	if base_path == "" or not ResourceLoader.exists(base_path):
 		push_warning("AssetLoader: base_mesh missing; spawn a placeholder.")
 		return Node3D.new()

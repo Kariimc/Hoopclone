@@ -5,7 +5,15 @@ class_name Spawner
 ## node: instance with `Spawner.new()`, call methods once from `_ready()`,
 ## passing the scene root to add children to.
 
-const PLAYER_MESH_GLB := "res://assets/models/player_base.glb"
+## The animated build of the player. It is the SAME model with motion-capture
+## clips baked onto its skeleton (see tools/mocap/retarget_bvh.py); the bare
+## model is the fallback so the scene still runs before any clip is generated.
+const PLAYER_MESH_GLB := "res://assets/models/player_animated.glb"
+const PLAYER_MESH_FALLBACK := "res://assets/models/player_base.glb"
+
+## Which clip a body idles on. Everyone stands and handles the ball until the
+## state machine starts driving them properly.
+const DEFAULT_CLIP := "dribble"
 
 # Ball skin (the locked leather photo). Dropped in via ADD-ASSETS; orange fallback
 # until then. Albedo + optional derived normal map, any common image extension.
@@ -51,9 +59,10 @@ func ensure_player_body(root: Node3D, player: Node3D, player_team: String) -> vo
 		# that aren't placed yet are simply skipped, so the bare mesh still shows.
 		var loader := AssetLoader.new()
 		root.add_child(loader)
-		var inst := loader.spawn_player(player_team)
+		var inst := loader.spawn_player(player_team, "Jersey", PLAYER_MESH_GLB)
 		inst.name = "player_base"
 		player.add_child(inst)
+		_play_clip(inst, DEFAULT_CLIP)
 		print("Player mesh instanced + dressed (%s) from %s" % [player_team, PLAYER_MESH_GLB])
 		return
 	print("Player mesh not found (%s) — using capsule placeholder." % PLAYER_MESH_GLB)
@@ -154,12 +163,14 @@ func spawn_defender(root: Node3D, player: Node3D, away_team: String = "STM") -> 
 ## Give a body the real player model in a team's colours, falling back to a
 ## coloured capsule only if the model is missing, so the scene never breaks.
 func _dress(root: Node3D, body: Node3D, team_id: String) -> void:
-	if ResourceLoader.exists(PLAYER_MESH_GLB):
+	var mesh_path := PLAYER_MESH_GLB if ResourceLoader.exists(PLAYER_MESH_GLB) else PLAYER_MESH_FALLBACK
+	if ResourceLoader.exists(mesh_path):
 		var loader := AssetLoader.new()
 		root.add_child(loader)
-		var inst := loader.spawn_player(team_id)
+		var inst := loader.spawn_player(team_id, "Jersey", mesh_path)
 		inst.name = "body_%s" % team_id
 		body.add_child(inst)
+		_play_clip(inst, DEFAULT_CLIP)
 		return
 	var ph := MeshInstance3D.new()
 	ph.name = "PlaceholderBody"
@@ -228,3 +239,36 @@ func _attrs_for(roster: Array, index: int) -> Attributes:
 	if index < roster.size():
 		return Attributes.from_json(roster[index])
 	return Attributes.new({"perim_d": 60, "inside_d": 60, "speed": 55})
+
+## Start a clip on a freshly instanced body, looping it. Silent if the model has
+## no such clip, so a body without animation still spawns and stands.
+func _play_clip(inst: Node, clip: String) -> void:
+	var ap := _find_anim_player(inst)
+	if ap == null:
+		return
+	var name := clip
+	if not ap.has_animation(name):
+		# glTF often prefixes clips with the armature they belong to.
+		for candidate in ap.get_animation_list():
+			if candidate.ends_with(clip):
+				name = candidate
+				break
+	if not ap.has_animation(name):
+		push_warning("Spawner: no clip '%s' on this body (have: %s)"
+			% [clip, ", ".join(ap.get_animation_list())])
+		return
+	var anim := ap.get_animation(name)
+	anim.loop_mode = Animation.LOOP_LINEAR
+	ap.play(name)
+	# Start everyone at a different point in the cycle, or ten players dribble in
+	# perfect unison and the whole floor looks like a chorus line.
+	ap.seek(randf() * anim.length, true)
+
+func _find_anim_player(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n
+	for c in n.get_children():
+		var r := _find_anim_player(c)
+		if r != null:
+			return r
+	return null

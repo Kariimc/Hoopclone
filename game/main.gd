@@ -51,6 +51,8 @@ func _ready() -> void:
 	_crowd.build(self)
 	_arena.build_courtside(self)
 	_deck.build(self)
+	add_child(BuildFeed.new())
+	add_child(SessionRecorder.new())
 
 func _on_basket_made() -> void:
 	# Crowd roars on a make, then eases back to idle.

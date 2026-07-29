@@ -283,6 +283,42 @@ clip library and wire it to `anim_state_machine.gd`.
 **PowerShell gotcha, again:** piping a long render into `Select-Object -First N`
 kills it early. Redirect to a log file and filter afterwards.
 
+### Session 2026-07-29, part 8 - motion capture is IN THE GAME, and a live loop
+
+Every body on the floor now loads `assets/models/player_animated.glb` - the same
+model with a retargeted CMU capture baked on - and plays it looped, each starting
+at a random point in the cycle so ten players do not dribble in unison. The bare
+model stays as an automatic fallback, so the scene still runs if no clip has been
+generated yet. Clips are retargeted **in place** (`--in-place 1`, the default):
+the GAME moves the character, and a clip that also travels makes him skate.
+
+**Two live channels now exist, both automatic:**
+- `game/ui/build_feed.gd` draws a panel over the game showing whatever is in
+  `.build_status.txt`. Write to that file and the player sees it within a second.
+- `game/dev/session_recorder.gd` writes `dev_session/session.log` (position,
+  speed, feet-down, defenders contesting, fps, twice a second) and a screenshot
+  every three seconds. That is how a session gets debugged without the player
+  having to describe anything. Both are gitignored and editor/debug only.
+- A watcher script in the session scratchpad restarts the game window whenever a
+  file under `game/`, `assets/`, `data/` or `project.godot` changes. It does NOT
+  watch `tests/`. **A stale window is the first thing to suspect** when the live
+  game disagrees with a headless run - it cost a debugging detour here.
+
+### The next real blocker: the ball is part of the player's body
+
+`player_base.glb` has a basketball MODELLED AND TEXTURED INTO the mesh, in his
+right hand. That is why he reads as holding a ball rather than dribbling: the
+ball is welded to the hand and moves with it. A separate Ball node is spawned too,
+so there are effectively two balls.
+
+Removing it is not a quick win: the mesh is **28,463 verts in 2,555 disconnected
+loose parts** (typical of a generated mesh), so "separate by loose parts" does not
+isolate the ball. Next approach: classify faces by sampling the albedo texture at
+their UVs (basketball orange is well separated from the blue kit, less so from
+skin) AND gate on proximity to the RightHand bone, then delete that set and export
+a ball-free player. The ball then becomes the existing standalone Ball node,
+parented to the hand only while dribbling.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

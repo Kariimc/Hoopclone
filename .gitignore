@@ -28,3 +28,8 @@ venv/
 # machine-specific bridge config stay local. Reinstall from the purchased zip.
 /addons/godot_mcp/
 /.mcp.json
+# Live build notes shown in the running game; per-session, not project state.
+/.build_status.txt
+
+# Live play recording used to debug a session remotely; never project state.
+/dev_session/

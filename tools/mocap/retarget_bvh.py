@@ -38,6 +38,9 @@ START   = int(cli("--start", "0"))
 END     = int(cli("--end", "0"))
 STEP    = int(cli("--step", "4"))      # CMU is 120fps; every 4th frame gives 30fps
 LOOP    = cli("--loop", "0") == "1"
+# In-place clips carry no travel. The GAME moves the character; if the clip
+# also slides him, the two fight and he skates across the floor.
+IN_PLACE = cli("--in-place", "1") == "1"
 
 # CMU bone -> player-rig bone. Limbs match by name; spine and neck do not.
 MAP = {
@@ -143,7 +146,7 @@ for f in range(START if START > 0 else 1, end + 1, STEP):
         solves += 1
 
     hips = tgt.pose.bones.get("Hips")
-    if hips is not None and src_hips is not None:
+    if hips is not None and src_hips is not None and not IN_PLACE:
         world_hips = (src.matrix_world @ src_hips.matrix).to_translation()
         if origin is None:
             origin = world_hips.copy()
