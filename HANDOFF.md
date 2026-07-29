@@ -243,6 +243,46 @@ player in a numbered kit. The art is not the weak link; the animation is.
 KILLS it when N results arrive. A 38-frame render silently stopped at 5 frames.
 Redirect to a file and filter afterwards.
 
+### Session 2026-07-29, part 7 - real basketball motion capture, retargeted
+
+**The find:** Carnegie Mellon's Graphics Lab motion capture database is free, has
+no licence fee, and **subject 06 is basketball** - forward/backward/sideways
+dribble, dribbling with turns, freestyle dribble, and crossover-and-shoot. All 15
+trials are downloaded to `assets/mocap/06_01.bvh` .. `06_15.bvh` from the GitHub
+mirror `una-dinosauria/cmu-mocap` (path shape `data/006/06_NN.bvh` - note the
+THREE-digit folder). No GPU, no account, no video needed.
+
+Trial map: 06_02..05 forward dribble, 06_06..07 backward, 06_08..09 sideways,
+06_10..12 dribble with turns, 06_13 freestyle, **06_14..15 crossover + shoot**.
+
+`tools/mocap/retarget_bvh.py` drives the shipped player rig from a BVH. The CMU
+skeleton names its limb bones IDENTICALLY to ours (LeftUpLeg, LeftForeArm, ...);
+only spine/neck differ and are mapped explicitly.
+
+**Three method failures, recorded so nobody repeats them:**
+1. Hand-picking euler angles per bone - tore the arms into spikes. The rig's
+   local bone axes are not what they look like. Never author this rig that way.
+2. Composing the correction quaternion by hand in parent space - contorted the
+   whole body. **The method that works: write `pose_bone.matrix` directly**
+   (armature space) and call `view_layer.update()` before solving the children,
+   so Blender derives the local rotation including each bone's rest orientation.
+3. Deriving travel scale from leg lengths and THEN multiplying by 100 - threw the
+   player a hundred metres off camera. The leg-length ratio already converts into
+   the rig's bone units; do not scale again.
+
+**Also load-bearing:** the collarbones are deliberately NOT retargeted. The two
+skeletons hang their clavicles at very different rest angles, and aiming them by
+direction dragged the whole arm chain into the chest. Left at rest they act as a
+stable socket while the upper arm carries the motion - standard practice.
+
+**State:** legs, hips, spine and head retarget cleanly and read as a real person
+moving. The arms are stable but under-driven - they track low and do not yet read
+clearly as a dribble. Next step is the arm chain, then batch all 15 trials into a
+clip library and wire it to `anim_state_machine.gd`.
+
+**PowerShell gotcha, again:** piping a long render into `Select-Object -First N`
+kills it early. Redirect to a log file and filter afterwards.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
