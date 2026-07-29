@@ -52,6 +52,42 @@ not inferred:
 Everything else in PROGRESS.md is unchanged - that file, not this one, is the
 authoritative checklist.
 
+### Session 2026-07-29, part 2 - the court had no floor
+
+A council (three challenger voices + a synthesizing judge) was run on "what
+next". Verdict, which overruled the initial instinct to do a visual/asset pass
+first: fix the physics, then build the possession loop, and ship something
+VISIBLE in the same block so progress is legible to a non-programmer owner.
+
+Fixed and committed:
+
+- The court had **no collision shape**. Nothing in the game was standing on
+  anything. Added one to the `Floor` body.
+- Neither `player.gd` nor `defender.gd` applied gravity. Both do now.
+- The player's capsule was the engine default (radius .5, height 2) centred ON
+  the origin, so resting on the floor left the model a metre up. Now matches the
+  defender: radius .35, height 1.9, offset to stand on its feet.
+- **Root cause of the floating:** the defender slid into the attacker, the
+  attacker climbed the capsule and was carried at head height (measured Y 1.897)
+  while the pair drifted down the floor together. Player and defender now sit on
+  **separate collision layers masking only the floor**, so bodies pass through
+  each other. The contest model reads positions, never contacts, so nothing is
+  lost. Real jostling/screens are a later feature needing a shared layer AND an
+  anti-climb rule - do not simply re-merge the layers.
+- Defender slide gained arrival braking so it settles on its guard spot.
+- `run_tests.gd` now boots the real `main.tscn` and asserts the wiring chain plus
+  both standing heights. This closes the audit's §6 test-strategy gap and is the
+  guard for the whole bug class above. 21/21 green.
+
+**Gotcha that cost time:** with the Godot editor open, a **newly created** script
+under `res://` will not run via `--script` - the run hangs until the editor
+imports it. Existing scripts are fine. Put throwaway diagnostics inside an
+already-imported file (e.g. `run_tests.gd`) rather than creating a probe file.
+
+**Next:** the possession loop (`tools/sim/possession.py`), headless and seeded,
+then its GDScript mirror, then place the already-written scorebug and ticker in
+the scene so the owner can see a clock and a score move.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

@@ -16,7 +16,25 @@ var attributes: Attributes
 var anim: AnimStateMachine
 var shot: ShotController
 
+## Gravity. Neither body ever leaves the ground in this build, but without it a
+## body that slides into another capsule rides UP it and stays there - that is
+## how the player ended up standing in mid-air at rim height (verified 2026-07-29).
+## Requires a collision shape on the court floor, or everything simply falls.
+var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
+
+
+## Collision layers. 1 = the court floor. Players and defenders each get their
+## own layer and mask ONLY the floor, so bodies pass through each other.
+##
+## Why: body-to-body collision bought nothing here - the contest model reads
+## POSITIONS, never contacts - but it cost a whole bug class. Measured
+## 2026-07-29: the defender slid into the attacker, the attacker climbed onto
+## the capsule and was carried at head height (Y 1.897) while the pair drifted
+## down the floor together. Real jostling/screens are a later, deliberate
+## feature; when that lands, give them a shared layer AND a way not to climb.
 func _ready() -> void:
+	collision_layer = 2
+	collision_mask = 1
 	if attributes == null:
 		attributes = Attributes.new()
 	anim = AnimStateMachine.new()
@@ -51,6 +69,10 @@ func _physics_process(delta: float) -> void:
 			move = dir.normalized() * max_speed()
 	velocity.x = move_toward(velocity.x, move.x, accel * delta)
 	velocity.z = move_toward(velocity.z, move.z, accel * delta)
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		velocity.y -= _gravity * delta
 	move_and_slide()
 	global_position.x = clampf(global_position.x, -court_half_x, court_half_x)
 	global_position.z = clampf(global_position.z, -court_half_z, court_half_z)

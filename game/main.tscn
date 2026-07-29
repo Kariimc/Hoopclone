@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://dxa0cvk3gyv5d"]
+[gd_scene load_steps=16 format=3 uid="uid://dxa0cvk3gyv5d"]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/camera/broadcast_camera.gd" id="2_cam"]
@@ -12,6 +12,9 @@ albedo_color = Color(0.52, 0.34, 0.17, 1)
 material = SubResource("StandardMaterial3D_d6fye")
 size = Vector2(28, 15)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(28, 0.2, 15)
+
 [sub_resource type="CylinderMesh" id="CylinderMesh_hylkq"]
 top_radius = 0.45
 bottom_radius = 0.45
@@ -21,6 +24,8 @@ height = 0.02
 albedo_color = Color(1, 0.392157, 0, 1)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_5rctg"]
+radius = 0.35
+height = 1.9
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_7xrh2"]
 size = Vector2(50, 35)
@@ -64,6 +69,10 @@ transform = Transform3D(0.86, -0.35, 0.37, 0, 0.72, 0.69, -0.5, -0.6, 0.62, 0, 1
 [node name="FloorMesh" type="MeshInstance3D" parent="Floor"]
 mesh = SubResource("PlaneMesh_1lkmb")
 
+[node name="FloorCollision" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_floor")
+
 [node name="LeftHoop" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.7, 3.05, 0)
 mesh = SubResource("CylinderMesh_hylkq")
@@ -80,6 +89,7 @@ court_half_x = 13.5
 court_half_z = 7.2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
 shape = SubResource("CapsuleShape3D_5rctg")
 
 [node name="ArenaFloor" type="MeshInstance3D" parent="."]
