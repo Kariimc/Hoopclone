@@ -165,6 +165,44 @@ every render and the engine sees the back of the model.
 empty dark band, and there is still no score or clock. 5-on-5 and the possession
 loop remain the two big pieces.
 
+### Session 2026-07-29, part 5 - five a side, and the concrete
+
+- The blue capsule is gone. The defender wears the real player model in the away
+  kit, via a shared `_dress()` helper in the spawner.
+- `main.gd` now loads `data/rosters/league.json` and splits it BY TEAM
+  (`_load_teams`). The old `_load_roster` flattened every team into one list,
+  which is the reason only the first player of the first team was ever used.
+- Ten bodies on the floor: 5 CRW vs 5 STM. The four extra defenders are real
+  Defender nodes that are deliberately never `assign()`ed a man, so they hold
+  their spots instead of all chasing the ball. They ARE registered on the shot,
+  so the contest model sees all five and a shot into a crowd is punished.
+- `game/arena/seating_deck.gd` fills the dark ring: a stepped bowl of treads and
+  risers derived FROM the CrowdFans constants (change the crowd layout and the
+  concrete follows), a dark apron, 52 courtside chairs on both sidelines, and a
+  scorer's table on the far side.
+
+### ANIMATION - measured facts, read before promising anything
+
+`assets/models/player_base.glb` contains **one animation clip, 0.30 seconds long,
+5 tracks**. That is a stub, not an animation. It is the entire reason the player
+stands holding the ball: there is nothing to play. `anim_state_machine.gd`
+enumerates a full moveset but no clip behind any state exists.
+
+The skeleton is **24 bones with Mixamo naming** (Hips, LeftUpLeg, LeftLeg,
+LeftFoot, LeftToeBase, Spine/Spine01/Spine02, LeftShoulder, LeftArm, LeftForeArm,
+LeftHand, neck, Head, ...). That is the good news - this rig accepts
+Mixamo-format clips almost directly.
+
+Sources checked (2026-07-29):
+- **Mixamo** - has basketball clips (dribble, shoot, layup), free for commercial
+  use, but downloads need an Adobe login. Only Kariim can do that step.
+- **Quaternius Universal Animation Library** - CC0, 120+ clips, explicitly
+  Mixamo-rig compatible, FBX/GLB/Godot builds, free tier. **No sports clips** -
+  locomotion, combat, emotes only. Useful for run/idle/strafe, useless for
+  dribble/jumpshot. itch.io needs an account to download.
+- Hand-authoring clips in Blender against these known bone names is viable
+  (3d-master-modeler Template I) and needs no login. Lower ceiling than mocap.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

@@ -109,7 +109,7 @@ func equip_player_shot(root: Node3D, player: Node3D, on_made: Callable) -> void:
 ## Sprint 5: an on-ball defender that marks the player and protects the right
 ## basket, sliding to stay in the lane. Its positioning feeds ContestModel, so
 ## a contested shot's make % drops.
-func spawn_defender(root: Node3D, player: Node3D) -> void:
+func spawn_defender(root: Node3D, player: Node3D, away_team: String = "STM") -> void:
 	if player == null:
 		return
 	var rim := root.get_node_or_null("RightHoop") as Node3D
@@ -136,17 +136,7 @@ func spawn_defender(root: Node3D, player: Node3D) -> void:
 	col.shape = shape
 	col.position = Vector3(0.0, 0.95, 0.0)
 	defender.add_child(col)
-	var body := MeshInstance3D.new()
-	body.name = "DefenderBody"
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.35
-	capsule.height = 1.9
-	body.mesh = capsule
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.16, 0.32, 0.62)   # blue, the opposing kit
-	body.material_override = mat
-	body.position = Vector3(0.0, 0.95, 0.0)
-	defender.add_child(body)
+	_dress(root, defender, away_team)
 
 	# Register the defender so a taken shot is contested. Safe even before the
 	# shot is equipped with a ball/rim — set_defenders just stores the list.
@@ -159,3 +149,82 @@ func spawn_defender(root: Node3D, player: Node3D) -> void:
 		print("Defender spawned: marks the player, protects RightHoop.")
 	else:
 		push_warning("Defender spawned but shot is not equipped — shots will be uncontested.")
+
+
+## Give a body the real player model in a team's colours, falling back to a
+## coloured capsule only if the model is missing, so the scene never breaks.
+func _dress(root: Node3D, body: Node3D, team_id: String) -> void:
+	if ResourceLoader.exists(PLAYER_MESH_GLB):
+		var loader := AssetLoader.new()
+		root.add_child(loader)
+		var inst := loader.spawn_player(team_id)
+		inst.name = "body_%s" % team_id
+		body.add_child(inst)
+		return
+	var ph := MeshInstance3D.new()
+	ph.name = "PlaceholderBody"
+	var capsule := CapsuleMesh.new()
+	capsule.radius = 0.35
+	capsule.height = 1.9
+	ph.mesh = capsule
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.5, 0.5, 0.55)
+	ph.material_override = mat
+	ph.position = Vector3(0.0, 0.95, 0.0)
+	body.add_child(ph)
+
+## Half-court set: where the other four of each side stand. Offence attacks the
+## right basket, so the defence sits between them and it.
+const HOME_SPOTS := [
+	Vector3(5.4, 0.0, -5.6), Vector3(5.4, 0.0, 5.6),
+	Vector3(9.2, 0.0, -3.0), Vector3(9.2, 0.0, 3.0),
+]
+const AWAY_SPOTS := [
+	Vector3(7.2, 0.0, -4.6), Vector3(7.2, 0.0, 4.6),
+	Vector3(10.6, 0.0, -2.2), Vector3(10.6, 0.0, 2.2),
+]
+
+## Fill the floor out to five a side around the controlled player and the on-ball
+## defender that already exist.
+##
+## The four extra defenders are real Defender bodies but are never `assign()`ed a
+## man, so they hold their spot instead of all chasing the ball - that is the
+## whole difference between a set defence and five players in a heap. They ARE
+## registered on the shot, so the contest model sees every one of them and a shot
+## taken into a crowd is properly punished.
+func spawn_team_mates(root: Node3D, player: Node3D, home: Array, away: Array,
+		home_team: String, away_team: String) -> void:
+	for i in HOME_SPOTS.size():
+		var mate := Defender.new()          # a body that holds position; no man assigned
+		mate.name = "Home_%d" % i
+		mate.attributes = _attrs_for(home, i + 1)
+		root.add_child(mate)
+		mate.global_position = HOME_SPOTS[i]
+		_dress(root, mate, home_team)
+
+	var opponents: Array[Defender] = []
+	for i in AWAY_SPOTS.size():
+		var opp := Defender.new()
+		opp.name = "Away_%d" % i
+		opp.attributes = _attrs_for(away, i + 1)
+		root.add_child(opp)
+		opp.global_position = AWAY_SPOTS[i]
+		_dress(root, opp, away_team)
+		opponents.append(opp)
+
+	if player is Player and (player as Player).shot != null:
+		var shot := (player as Player).shot
+		var all: Array[Defender] = []
+		all.append_array(shot.defenders)
+		all.append_array(opponents)
+		shot.set_defenders(all)
+		print("Teams on the floor: 5 %s vs 5 %s (%d contesting)" % [home_team, away_team, all.size()])
+	else:
+		push_warning("Team mates spawned but the shot is not equipped - shots will be uncontested.")
+
+## Attributes for the nth player of a roster, or league-average if the roster is
+## short, so a thin roster still fields five bodies.
+func _attrs_for(roster: Array, index: int) -> Attributes:
+	if index < roster.size():
+		return Attributes.from_json(roster[index])
+	return Attributes.new({"perim_d": 60, "inside_d": 60, "speed": 55})
