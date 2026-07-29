@@ -319,6 +319,39 @@ skin) AND gate on proximity to the RightHand bone, then delete that set and expo
 a ball-free player. The ball then becomes the existing standalone Ball node,
 parented to the hand only while dribbling.
 
+### Session 2026-07-29, part 9 - the welded ball is out
+
+tools/models/strip_ball.py removes the basketball that was modelled and textured
+INTO the player mesh. It produces assets/models/player_noball.glb, which is now
+the source the motion-capture retarget runs on.
+
+How it finds the ball, because no single signal works:
+1. Which hand - count ball-coloured faces near each hand bone and take the
+   winner. The first attempt assumed RightHand and bit a hole in the EMPTY hand.
+   The ball is in LeftHand.
+2. Colour - sample the albedo texture at each face UV; basketball leather is a
+   saturated orange. Skin shares the hue but not the saturation, so saturation is
+   what actually separates them.
+3. Settle the centre - colour alone also catches orange kit trim, so iterate a
+   median inside one ball radius until the centre converges on the ball.
+4. Geometric sweep - take the whole sphere around that centre, because the dark
+   seam lines and shaded underside fail the colour test and otherwise survive as
+   an orange fringe. Spare faces close to the hand bone so the fingers stay,
+   EXCEPT ones colour already flagged as leather, or a fleck survives between
+   the fingers.
+
+Result: 3,180 faces removed, mesh 30,933 -> 27,753 polys, hand intact.
+
+PREMIUM ASSET GENERATION IS AVAILABLE. Higgsfield exposes Tripo text-to-3D and
+image-to-3D with texture_quality/geometry_quality set to "detailed" plus PBR, and
+Meshy for rigging existing GLBs. The account is on the ultra plan with ~2,585
+credits; a detailed textured asset costs about 12.5. Meshy via the Unity bridge
+is NOT usable here - it needs the Unity editor running and imports into a Unity
+project, not Godot.
+
+Live-reload gotcha: the watcher only matched *.gd,*.tscn,*.tres,*.json, so
+regenerating a .glb did NOT restart the game and the window silently showed stale
+art. It now also watches glb/png/jpeg/bvh/import.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
