@@ -17,6 +17,7 @@ const GameStateScript := preload("res://game/core/game_state.gd")
 var _crowd := CrowdBowl.new()
 var _arena := ArenaBuilder.new()
 var _spawner := Spawner.new()
+var _hoops := HoopBuilder.new()
 
 func _ready() -> void:
 	var gs := get_node("/root/GameState")
@@ -35,6 +36,7 @@ func _ready() -> void:
 
 	_spawner.apply_roster_to_player(player, roster)
 	_arena.apply_court_floor(self)
+	_hoops.build_all(self)
 	_spawner.ensure_player_body(self, player, player_team)
 	_spawner.equip_player_shot(self, player, _on_basket_made)
 	_spawner.spawn_defender(self, player)

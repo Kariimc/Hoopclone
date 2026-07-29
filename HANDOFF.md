@@ -88,6 +88,51 @@ already-imported file (e.g. `run_tests.gd`) rather than creating a probe file.
 then its GDScript mirror, then place the already-written scorebug and ticker in
 the scene so the owner can see a clock and a score move.
 
+### Session 2026-07-29, part 3 - the look pass
+
+Owner overruled the council and asked for looks before game logic. Delivered:
+
+- **HoopBuilder** (`game/arena/hoop_builder.gd`) turns each bare hoop anchor into
+  a real basket: rim torus, line-mesh net, glass backboard with a white padded
+  border and painted shooter square, gooseneck, stanchion, padded base. It never
+  moves the anchor - the anchor origin IS rim centre and the ball, shot and
+  contest models all read it.
+- **CrowdFans** (`game/arena/crowd_fans.gd`) draws 688 seated spectators through
+  ONE MultiMesh with every bit of motion in a vertex shader. That is the standard
+  stadium-crowd technique: the CPU never touches a fan. Per-instance custom data
+  carries a seed (rhythm, build, shirt colour, eagerness) so no two move together.
+  CrowdBowl owns the instance and forwards `set_intensity`, so the existing
+  made-basket hook already puts them on their feet.
+- **Kit swap fixed.** Measured: `player_base.glb` is a SINGLE mesh with ONE
+  surface and one baked full-body texture; the `*_jersey_albedo.png` files are
+  flat 2D garment layouts (front panel, back panel, shorts on a white sheet), NOT
+  unwrapped to this model's UVs. Assigning one as albedo painted garment artwork
+  across the whole character, face included - which is exactly what the owner saw.
+  Teams now TINT the baked texture. A real swap is gated behind a new
+  `"jersey_uv_matched": true` flag per team in the manifest, only correct once
+  someone authors a kit unwrapped to this model.
+
+**Two Godot gotchas that cost real time, both about the editor holding imports:**
+1. A **newly created** script under `res://` will not run via `--script` while the
+   editor is open - the run HANGS. Put throwaway diagnostics inside an
+   already-imported file instead.
+2. A new `class_name` is not visible to other scripts until Godot re-scans. Run
+   `godot --headless --editor --quit --path .` once after adding one, or every
+   caller fails with `Identifier "X" not declared in the current scope`.
+
+**Live-play loop:** a watcher script in the session scratchpad keeps one playable
+window open and restarts it whenever a game file changes (about 4 seconds), so the
+owner plays continuously while edits land. It only ever kills the PID it started.
+
+**Still visibly wrong:** fans are blocky and read as furniture; a wide empty dark
+band surrounds the court; the defender is still a blue capsule; still 1-on-1 not
+5-on-5; no arena above the crowd; no score or clock on screen.
+
+**Next:** better fan geometry (owner has Meshy, authorised free CC0 model
+downloads, and named the `3d-master-modeler` skill - which routes engine assets
+through headless Blender; `bpy` is NOT installed on this laptop). Then 5-on-5,
+then the possession loop.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
