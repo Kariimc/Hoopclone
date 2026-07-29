@@ -203,6 +203,46 @@ Sources checked (2026-07-29):
 - Hand-authoring clips in Blender against these known bone names is viable
   (3d-master-modeler Template I) and needs no login. Lower ceiling than mocap.
 
+### Session 2026-07-29, part 6 - motion capture WITHOUT a graphics card
+
+Measured: this laptop has **Intel Iris Xe integrated graphics, no CUDA**. That
+rules out the whole GVHMR / WHAM / 4D-Humans class of video-to-motion tools -
+they are CUDA-only. Do not sink time into them here.
+
+**The workaround that does work: MediaPipe Pose, which runs entirely on the CPU.**
+Installed (`mediapipe 1.0.0`, pulls opencv + matplotlib, userspace). No account,
+no GPU, no cloud. Two tools now live in `tools/mocap/`:
+
+- `video_to_joints.py` - any video file -> JSON of smoothed 3D joint tracks.
+- `retarget_to_rig.py` - that JSON -> bone rotations on the SHIPPED 24-bone rig
+  -> a glTF whose animations Godot imports by name. It solves each bone from the
+  DIRECTION between two tracked joints, expressed in parent space and walked
+  parents-first down the chain. Bone lengths are never touched, so the character
+  keeps its own proportions regardless of who was filmed.
+
+**Rights note, stated once:** pulling motion out of broadcast footage and shipping
+it is a rights problem, not a technical one. Film it, or use footage we own.
+
+### The lesson that changes how clips get authored
+
+A first pass hand-authored six clips (idle, dribble, run, jumpshot, def_slide,
+rebound) by picking **euler angles per bone by eye**. Rendering the jumpshot
+proved it wrong: the arms tear into spikes, because the assumed local bone axes
+are not the rig's actual axes. **Do not author clips by hand-picked euler angles
+on this rig.**
+
+The correct route is the one the retargeter already implements: author a move as
+**joint TARGET POSITIONS** and let the same direction-solver turn those into bone
+rotations. No axis guessing, and it shares a single code path with video capture.
+That is the next piece of work.
+
+Also worth knowing: the base player model renders **well** - a proper basketball
+player in a numbered kit. The art is not the weak link; the animation is.
+
+**PowerShell gotcha:** piping a long-running command into `Select-Object -First N`
+KILLS it when N results arrive. A 38-frame render silently stopped at 5 frames.
+Redirect to a file and filter afterwards.
+
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
