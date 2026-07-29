@@ -15,6 +15,8 @@ class_name Player
 var attributes: Attributes
 var anim: AnimStateMachine
 var shot: ShotController
+## Set by the spawner; drives which capture clip the body plays.
+var clip_driver: ClipDriver
 
 ## Gravity. Neither body ever leaves the ground in this build, but without it a
 ## body that slides into another capsule rides UP it and stays there - that is
@@ -55,6 +57,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		anim.transition(AnimStateMachine.State.JUMPSHOT)
 	elif event.is_action_released("shoot"):
 		shot.release()
+		if clip_driver != null:
+			clip_driver.fire_shot()
 
 func _physics_process(delta: float) -> void:
 	# Lock movement while charging a shot (set feet, like a real jumper).

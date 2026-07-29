@@ -381,6 +381,29 @@ everything turned the stands into painted statues.
 Generation settings that matter: model tripo_3d (or tripo_h3_1_image_to_3d),
 texture_quality "detailed", geometry_quality "detailed", pbr true, auto_size true,
 and face_limit to cap the mesh at source. About 12.5 credits per asset.
+### Session 2026-07-29, part 11 - the full moveset, and a shared asset library
+
+tools/mocap/build_moveset.py builds EVERY clip into one glTF in a single pass.
+Five clips, each a slice of a Carnegie Mellon basketball capture retargeted onto
+the player rig: idle, dribble, run, crossover, jumpshot. Edit the CLIPS table at
+the top to add or re-time one; nothing else needs touching.
+
+game/player/clip_driver.gd picks the clip from how the body is actually moving -
+run above 1.2 m/s, dribble while walking, idle when still - and a shot clip wins
+for 0.85 s when the player releases the shoot button. It resolves clip names
+tolerantly because glTF prefixes them with the armature, and a missing clip is
+skipped rather than fatal so a body without animation still spawns.
+
+### Shared asset library: C:\Users\Kariim\Dev\asset-library (its own git repo)
+
+Not tied to this project. Holds three A-pose base bodies (athletic male, athletic
+female, heavyset male) as untouched raw generations PLUS the pipeline tools:
+optimise_asset.py, retarget_bvh.py, strip_prop_from_mesh.py. Its README carries
+the rule everything follows - generate at maximum quality, then cut to budget -
+with the measured numbers behind it.
+
+Meshy rigging (3d_rigging via Higgsfield) FAILED server-side on a 20k-face,
+4K-texture body. Not retried. If it is wanted later, try a decimated body first.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

@@ -67,7 +67,9 @@ func ensure_player_body(root: Node3D, player: Node3D, player_team: String) -> vo
 		var inst := loader.spawn_player(player_team, "Jersey", PLAYER_MESH_GLB)
 		inst.name = "player_base"
 		player.add_child(inst)
-		_play_clip(inst, DEFAULT_CLIP)
+		var driver := _play_clip(inst, player)
+		if driver != null and player is Player:
+			(player as Player).clip_driver = driver
 		print("Player mesh instanced + dressed (%s) from %s" % [player_team, PLAYER_MESH_GLB])
 		return
 	print("Player mesh not found (%s) — using capsule placeholder." % PLAYER_MESH_GLB)
@@ -158,7 +160,7 @@ func _dress(root: Node3D, body: Node3D, team_id: String) -> void:
 		var inst := loader.spawn_player(team_id, "Jersey", mesh_path)
 		inst.name = "body_%s" % team_id
 		body.add_child(inst)
-		_play_clip(inst, DEFAULT_CLIP)
+		_play_clip(inst, body)
 		return
 	var ph := MeshInstance3D.new()
 	ph.name = "PlaceholderBody"
@@ -230,27 +232,21 @@ func _attrs_for(roster: Array, index: int) -> Attributes:
 
 ## Start a clip on a freshly instanced body, looping it. Silent if the model has
 ## no such clip, so a body without animation still spawns and stands.
-func _play_clip(inst: Node, clip: String) -> void:
+## Hand the body to a ClipDriver, which picks its clip from how it is moving.
+## Returns the driver so the caller can tell it about a shot.
+func _play_clip(inst: Node, owner_body: Node3D) -> ClipDriver:
 	var ap := _find_anim_player(inst)
 	if ap == null:
-		return
-	var name := clip
-	if not ap.has_animation(name):
-		# glTF often prefixes clips with the armature they belong to.
-		for candidate in ap.get_animation_list():
-			if candidate.ends_with(clip):
-				name = candidate
-				break
-	if not ap.has_animation(name):
-		push_warning("Spawner: no clip '%s' on this body (have: %s)"
-			% [clip, ", ".join(ap.get_animation_list())])
-		return
-	var anim := ap.get_animation(name)
-	anim.loop_mode = Animation.LOOP_LINEAR
-	ap.play(name)
-	# Start everyone at a different point in the cycle, or ten players dribble in
+		return null
+	var driver := ClipDriver.new()
+	driver.name = "ClipDriver"
+	owner_body.add_child(driver)
+	driver.setup(ap, owner_body)
+	# Start everyone at a different point in the cycle, or ten players move in
 	# perfect unison and the whole floor looks like a chorus line.
-	ap.seek(randf() * anim.length, true)
+	if ap.current_animation != "":
+		ap.seek(randf() * ap.current_animation_length, true)
+	return driver
 
 func _find_anim_player(n: Node) -> AnimationPlayer:
 	if n is AnimationPlayer:
