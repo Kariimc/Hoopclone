@@ -545,6 +545,39 @@ Wiring worth knowing:
   real speed, not simply on movement - which is when a shoe actually squeaks.
 - Buzzer on period end, whistle on shot-clock expiry, both from the scorebug's
   own signals.
+### Session 2026-07-29, part 16 - motion continuity
+
+Three changes to `clip_driver.gd`, all aimed at the same thing: motion that reads
+as a person moving rather than animation playing on top of movement.
+
+1. **Hysteresis.** A single speed threshold makes the clip flicker whenever the
+   player hovers on it, which reads far worse than either clip alone. He has to be
+   clearly running (1.6 m/s) before the run starts and clearly slower (1.1 m/s)
+   before it stops.
+2. **Smoothed speed.** The decision reads a smoothed speed, so one jittery frame
+   can never change which clip is playing.
+3. **Speed-matched playback.** Each locomotion clip records how fast the captured
+   performer was travelling; playback is scaled by actual speed over that. This is
+   the single biggest thing that stops retargeted motion looking like skating.
+
+Cross-fade was already in place (0.22 s), so the council's "clips snap" note was
+half right - the snap was the threshold flicker, not a missing blend.
+
+## Where this stands against the council's ranked list
+
+1. Broadcast HUD - **DONE** (score, quarter, game clock, shot clock)
+2. Sound - **DONE** (13 synthesised sounds, all wired to real events)
+3. Ball lives in the hand - **DONE** (bone attachment, procedural dribble)
+4. Consequence - possession change, out of bounds, rebounds, fouls - **NOT DONE**
+5. Motion continuity - **DONE** (blend, hysteresis, speed matching)
+6. Presentation reactions - crowd swell **DONE**; replay, announcer NOT DONE
+7. Environment fidelity - already strong, deliberately left alone
+8. Unique faces - deliberately NOT funded, invisible at broadcast distance
+
+**The one big remaining piece is number 4: consequence.** There is still no
+possession change, no out of bounds, no rebound contest and no fouls - which means
+the ball cannot actually be lost. That is the next real feature-shaped work, and
+it is game logic, not art.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
