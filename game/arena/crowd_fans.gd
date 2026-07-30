@@ -70,6 +70,12 @@ void vertex() {
 	v_part = part;
 
 	float seed = INSTANCE_CUSTOM.r;
+	// Every fan is the same model, so without per-fan POSE variation the stands
+	// read as one person stamped out several hundred times. Each gets a different
+	// forward lean and a different slouch, both fixed per fan rather than
+	// animated, which is what makes a still frame of the crowd look real.
+	float lean = (INSTANCE_CUSTOM.a - 0.5) * 0.42;
+	float slouch = (fract(seed * 31.7) - 0.5) * 0.22;
 	float eager = INSTANCE_CUSTOM.g;
 	float skin_t = INSTANCE_CUSTOM.b;
 	float phase = seed * 6.2831;
@@ -80,6 +86,12 @@ void vertex() {
 	v_trousers = mix(COLOR.rgb * 0.35, vec3(0.16, 0.17, 0.20), 0.55);
 
 	float moves = step(0.5, part);
+
+	// Lean pivots from the hips, so the further up the body a vertex sits the
+	// further it travels - a rotation, not a shear.
+	VERTEX.z += lean * up * moves * 0.30;
+	VERTEX.y -= abs(lean) * up * moves * 0.05;
+	VERTEX.y -= slouch * up * moves;
 
 	// Idle: a slow shift of weight, always present, never synchronised.
 	VERTEX.x += sin(TIME * (0.7 + seed * 0.5) + phase) * 0.018 * up * moves;
@@ -156,14 +168,15 @@ func build(root: Node3D) -> void:
 			var ang := deg_to_rad(-half + ARC_DEG * t)
 			var pos := Vector3(sin(ang) * rx, y, -cos(ang) * rz)
 
-			var basis := Basis(Vector3.UP, atan2(-pos.x, -pos.z))   # face the court
+			# Face the court, but nobody sits perfectly square to it.
+			var basis := Basis(Vector3.UP, atan2(-pos.x, -pos.z) + rng.randf_range(-0.38, 0.38))
 			basis = basis.scaled(Vector3.ONE * rng.randf_range(FAN_SCALE_MIN, FAN_SCALE_MAX))
 			mm.set_instance_transform(i, Transform3D(basis, pos))
 
 			var shirt: Color = SHIRT_COLORS[rng.randi_range(0, SHIRT_COLORS.size() - 1)]
 			mm.set_instance_color(i, shirt.lerp(Color(0.5, 0.5, 0.55), rng.randf() * 0.25))
 			# r = rhythm/threshold seed, g = eagerness, b = skin tone.
-			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf_range(0.55, 1.0), rng.randf(), 0.0))
+			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf_range(0.55, 1.0), rng.randf(), rng.randf()))
 			i += 1
 
 	var node := MultiMeshInstance3D.new()

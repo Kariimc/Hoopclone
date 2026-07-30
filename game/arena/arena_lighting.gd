@@ -33,6 +33,7 @@ func build(root: Node3D) -> void:
 	_add_fill(root)
 	_add_catwalk(root)
 	_polish_floor(root)
+	_add_court_probe(root)
 	_dim_the_stands(root)
 	print("Arena lighting: shadowed key + %d catwalk rigs, polished floor, graded" % CATWALK_POSITIONS.size())
 
@@ -158,12 +159,12 @@ func _polish_floor(root: Node3D) -> void:
 	# maple is the difference between a genuine floor and a lurid one - it reads
 	# as the wrong material long before anyone questions the geometry.
 	mat.albedo_color = Color(0.80, 0.755, 0.70)
-	mat.roughness = 0.20
+	mat.roughness = 0.13
 	mat.metallic = 0.0
-	mat.metallic_specular = 0.85
+	mat.metallic_specular = 1.0
 	mat.clearcoat_enabled = true
-	mat.clearcoat = 0.5
-	mat.clearcoat_roughness = 0.08
+	mat.clearcoat = 0.85
+	mat.clearcoat_roughness = 0.04
 	# Keep the wood reading as wood rather than a lit plastic sheet.
 	mat.rim_enabled = true
 	mat.rim = 0.15
@@ -178,3 +179,24 @@ func _dim_the_stands(root: Node3D) -> void:
 	var fans := root.get_node_or_null("Crowd_Fans") as MultiMeshInstance3D
 	if fans != null and fans.material_override is ShaderMaterial:
 		(fans.material_override as ShaderMaterial).set_shader_parameter("dim", 0.44)
+
+## A reflection probe covering the whole court.
+##
+## Screen-space reflections alone only mirror what is already on screen, so the
+## floor stays dull wherever there is nothing above it. A probe captures the
+## arena around it, which is what lets the boards, the rigs and the stands appear
+## in the wood - and that sheen is most of what separates a match floor from a
+## brown plane.
+func _add_court_probe(root: Node3D) -> void:
+	var probe := ReflectionProbe.new()
+	probe.name = "Court_Probe"
+	probe.size = Vector3(60.0, 24.0, 40.0)
+	probe.origin_offset = Vector3(0.0, 2.0, 0.0)
+	probe.intensity = 1.0
+	probe.max_distance = 60.0
+	probe.ambient_mode = ReflectionProbe.AMBIENT_ENVIRONMENT
+	# Baked once: the arena around the court does not move, and re-capturing every
+	# frame would cost far more than the reflection is worth.
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	root.add_child(probe)
+	probe.position = Vector3(0.0, 8.0, 0.0)

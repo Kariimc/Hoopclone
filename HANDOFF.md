@@ -618,6 +618,49 @@ direction while permanently facing the camera reads as a cardboard cutout being
 dragged around, and it undoes the motion capture entirely. `_face_travel()` in
 player, defender and teammate yaws smoothly toward the direction of travel. Yaw
 only; a basketball player never pitches or rolls.
+### Session 2026-07-29, part 18 - the run was broken, and why my check missed it
+
+Reported: "when the player is running the legs are completely weird and turned the
+wrong way." Correct, and I should have caught it - I had only ever rendered the
+DRIBBLE clip, never the run, and never with the character moving.
+
+**Root cause.** Direction AIMING constrains only where a bone POINTS. The twist
+around its own axis is left to whatever the minimal rotation produces, and down a
+leg chain that accumulates until the feet face sideways. Leaving the feet at rest
+(the earlier "fix") was worse: the legs swung while the ankles stayed at bind
+angle, so the feet twisted relative to the shins.
+
+**The method that works** is a rest-relative transfer of the whole orientation:
+
+    target_world = source_world * inverse(source_rest) * target_rest
+
+A source bone still at its own rest leaves the target at ITS rest; anything the
+performer did is reproduced, twist included.
+
+**But only on the legs.** Applied to the spine and arms it twists the torso and
+folds the arms across the chest, because those bones' rest orientations differ far
+more between the two skeletons. `build_moveset.py` now runs TWO solvers -
+full-rotation for the leg chain, direction aiming for everything else - and the
+split is recorded in the file with the reason.
+
+**Neck and head are driven by neither.** Aimed, the head tips back to stare at the
+ceiling. A level head reads correctly in every clip; a player looking up reads as
+broken in all of them.
+
+**Verification lesson, taken:** render EVERY clip and look at it, not just one, and
+judge the character in motion rather than a single still.
+
+### Floor reflections and crowd pose variety
+
+- A `ReflectionProbe` covers the whole court, baked once. Screen-space reflections
+  alone only mirror what is already on screen, so the floor stayed dull wherever
+  nothing was above it; the probe captures the arena so the boards, rigs and
+  stands appear in the wood. Floor roughness dropped to 0.13 with a strong
+  clearcoat.
+- Every fan now carries a fixed per-fan forward lean and slouch (pivoting from the
+  hips, so it is a rotation and not a shear) plus a wider yaw scatter. One model
+  stamped out several hundred times reads as one person repeated; per-fan pose is
+  what breaks that in a still frame.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
