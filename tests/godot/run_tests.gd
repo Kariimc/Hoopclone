@@ -114,6 +114,32 @@ func _scene_smoke() -> void:
 		_check("scene: defender stands on the floor (Y ~ 0), not sunk through it",
 			absf(defender.global_position.y) < 0.05)
 
+	# Audio wiring. This exists because the director was being CREATED at the
+	# bottom of main.gd's _ready() and wired at the top, so every
+	# `if _audio != null` guard read null and silently skipped: the game shipped
+	# with nothing but a crowd bed, and no buzzer or whistle connected at all.
+	# Nothing crashed and no test noticed. A null-guard that quietly does nothing
+	# is the whole bug class - assert the connection, not the object.
+	var ball := scene.get_node_or_null("Ball")
+	if ball != null:
+		_check("audio: a bounce is connected to something",
+			ball.get_signal_connection_list("bounced").size() >= 1)
+		_check("audio: a made basket is connected to something",
+			ball.get_signal_connection_list("made").size() >= 1)
+		_check("audio: a miss is connected to something",
+			ball.get_signal_connection_list("missed").size() >= 1)
+	var director: AudioDirector = null
+	for child in scene.get_children():
+		if child is AudioDirector:
+			director = child
+			break
+	_check("audio: the director is in the scene", director != null)
+	if director != null:
+		_check("audio: the director knows where the ball and the player are",
+			director.ball != null and director.player != null)
+	_check("audio: the SFX and Crowd buses exist",
+		AudioServer.get_bus_index("SFX") >= 0 and AudioServer.get_bus_index("Crowd") >= 0)
+
 	scene.queue_free()
 
 func _check(label: String, cond: bool) -> void:

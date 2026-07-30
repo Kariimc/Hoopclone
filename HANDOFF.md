@@ -820,3 +820,82 @@ export now.
 **Proof:** Godot self-test `ALL GODOT TESTS PASSED` (exit 0). The Python sim
 tests could NOT be run - pytest is not installed on this machine - but nothing
 under `tools/sim` was touched.
+
+### Session 2026-07-30, part 2 - the sound was static, and nothing was plugged in
+
+The owner: "the sound engine needs to be upgraded, the sounds are low quality and
+just sound like a staticy old TV." Both halves of that turned out to be true, and
+the second one was worse than the first.
+
+**Nothing was connected.** `main.gd` created the `AudioDirector` and the
+`Scorebug3D` at the BOTTOM of `_ready()` and wired them at the TOP. Every
+`if _audio != null` / `if _bug != null` guard in between was reading null and
+skipping silently. The game shipped with the crowd bed and nothing else - no
+bounce, no rim, no swish - and the buzzer and shot-clock whistle were never
+connected at all. Nothing crashed, nothing warned, and no test noticed, because
+a null guard that quietly does nothing looks exactly like working code.
+
+`tests/godot/run_tests.gd` now asserts the CONNECTIONS rather than the objects.
+Proven by revert: putting the ordering back produces
+`FAIL audio: a bounce is connected to something` and
+`FAIL audio: the director knows where the ball and the player are`, then
+`ALL GODOT TESTS PASSED` on restore.
+
+**The sounds themselves were noise.** `tools/audio/make_sfx.py` is rebuilt. What
+was wrong, and what replaced it:
+
+- Every texture was white noise behind a ONE-POLE filter. Six dB per octave
+  barely dents broadband noise, so the crowd, the net and the sneakers were all
+  hiss with a tilt. Static is, definitionally, flat noise. Filters are proper
+  biquads now (scipy), and each texture is built from structured events.
+- The crowd was noise. A crowd is voices, so it is synthesised as voices: a
+  glottal pulse at a real speaking pitch through three formant resonators,
+  ~900 of them scattered across the bed, ~950 shouting in the roar. Formants are
+  what make a sound read as a person rather than as air.
+- The net was one noise burst. It is twelve nylon cords brushed in sequence now,
+  each a few milliseconds after the last and each duller than the one above it.
+- Nothing was in a room. There is a synthetic arena impulse response (forty early
+  reflections off a shoebox, then a three-band decaying tail: 2.4 s low, 1.6 s
+  mid, 0.8 s high) and every sound has a send to it, small for things at your
+  feet and large for the horn.
+
+**`tools/audio/verify_sfx.py` is the gate.** Four numbers per file: spectral
+FLATNESS (1.0 is literally television static, 0.0 a pure tone), CREST (peak over
+RMS - how much punch survives), CENTRE (spectral centroid), and MOVEMENT (the
+spread of the sound's own loudness across its frames). Movement exists because
+flatness alone cannot tell a crowd from a drone - an intermediate pass of the bed
+measured 0.001 flat with all its weight in a rumble, which is a hum, and only the
+movement number would have caught it.
+
+    python tools/audio/verify_sfx.py --dir assets/audio --against <old set>
+
+### Measured, before -> after
+
+| file | flatness | centre of weight |
+|---|---|---|
+| swish | 0.477 -> **0.010** | 12 596 Hz -> **3 907 Hz** |
+| crowd_roar | 0.271 -> **0.000** | 4 115 Hz -> **554 Hz** |
+| crowd_bed | 0.141 -> **0.001** | 2 237 Hz -> **862 Hz** |
+| squeak | 0.153 -> **0.001** | 4 533 Hz -> **1 912 Hz** |
+| dribble | 0.045 -> **0.018** | 800 Hz -> **405 Hz** |
+
+The old set failed its own check on four files. The new set passes on all
+thirteen. A swish at 0.477 flatness centred at 12.6 kHz is not a net, it is hiss
+with the bass removed - that one number is the owner's complaint, written down.
+
+**The engine, not just the files.** `game/audio/audio_director.gd`:
+
+- Anything that happens somewhere is now played by an `AudioStreamPlayer3D` AT
+  that spot - the bounce at the ball, the squeak at the feet, iron and net at the
+  rim - with an inverse-distance rolloff and a per-sound carry distance (a bounce
+  dies in 26 m, the horn carries 90). Flat playback was the single biggest thing
+  making the mix read as a soundboard rather than a court.
+- Separate `SFX` and `Crowd` buses under a limited Master, built in code so a
+  missing bus-layout file cannot change the mix. A roar and a buzzer landing
+  together used to clip.
+- Twelve positional voices plus six flat ones, up from eight flat.
+
+**Proof:** `ALL GODOT TESTS PASSED` (exit 0), 16 checks including the six new
+audio ones, plus the revert-to-red run quoted above. `SFX-CHECK: PASS` on all
+thirteen files. Nothing was listened to - this machine has no way to play audio
+back into a session - so every claim here is a measurement, not an opinion.

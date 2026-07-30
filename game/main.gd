@@ -46,6 +46,18 @@ func _ready() -> void:
 	if cam != null and player != null:
 		cam.set_target(player)
 
+	# Sound and the bug come up FIRST, because the wiring below connects to them.
+	# They used to be created at the bottom of this function, which meant every
+	# `if _audio != null` and `if _bug != null` guard below was reading null and
+	# silently skipping - so nothing but the crowd bed ever played, and the
+	# buzzer and shot-clock whistle were never connected at all.
+	_audio = AudioDirector.new()
+	add_child(_audio)
+	_bug = Scorebug3D.new()
+	_bug.home_abbr = player_team
+	_bug.away_abbr = away_team
+	add_child(_bug)
+
 	_spawner.apply_roster_to_player(player, roster)
 	_arena.apply_court_floor(self)
 	_hoops.build_all(self)
@@ -57,6 +69,13 @@ func _ready() -> void:
 		player.audio = _audio
 
 	var ball := get_node_or_null("Ball") as Ball
+	if _audio != null:
+		# Give the director the things that make noise, so a bounce comes from
+		# the ball and a squeak from the feet rather than from the middle of the
+		# screen.
+		_audio.ball = ball
+		_audio.player = player
+		_audio.rim_node = get_node_or_null("RightHoop") as Node3D
 	if ball != null and _audio != null:
 		ball.bounced.connect(_audio.on_dribble)
 		ball.made.connect(_audio.on_made)
@@ -69,13 +88,6 @@ func _ready() -> void:
 	_arena.build_courtside(self)
 	_deck.build(self)
 	_light.build(self)
-	_audio = AudioDirector.new()
-	add_child(_audio)
-
-	_bug = Scorebug3D.new()
-	_bug.home_abbr = player_team
-	_bug.away_abbr = away_team
-	add_child(_bug)
 
 	add_child(BuildFeed.new())
 	add_child(SessionRecorder.new())
