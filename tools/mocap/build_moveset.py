@@ -32,7 +32,7 @@ alone they act as a stable socket while the upper arm carries the motion, which 
 standard practice.
 """
 import bpy, os, sys
-from mathutils import Vector, Quaternion
+from mathutils import Vector, Quaternion, Euler
 
 def cli(n, d=None):
     a = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else []
@@ -55,6 +55,10 @@ CLIPS = [
 ]
 
 MAP = {
+    # Hips are NOT driven. The two skeletons hold the pelvis ~180 degrees apart in
+    # bind pose, so transferring its rotation turns the whole character upside
+    # down - verified by rendering it. The facing correction below handles what
+    # driving the hips was meant to fix.
     "LeftUpLeg": "LeftUpLeg", "LeftLeg": "LeftLeg", "LeftFoot": "LeftFoot",
     "LeftToeBase": "LeftToeBase",
     "RightUpLeg": "RightUpLeg", "RightLeg": "RightLeg", "RightFoot": "RightFoot",
@@ -112,6 +116,16 @@ def rest_world_rotations(ob):
 TGT_REST = rest_world_rotations(tgt)
 SRC_REST = {}
 made = []
+
+## The performer faced whatever direction the capture stage put them in, and the
+## spine chain inherits that while the hips do not - which is why the torso ended
+## up facing backwards over a perfectly good running stride. Driving the hips as
+## well fixes the mismatch, and cancelling the performer's own facing (measured
+## once, on the first sampled frame) keeps every clip pointing the same way so the
+## game can turn the character itself.
+def yaw_only(q):
+    e = q.to_euler("YXZ")
+    return Euler((0.0, e.y, 0.0), "YXZ").to_quaternion()
 
 for clip, bvh, start, end, step in CLIPS:
     path = os.path.join(MOCAP, bvh)

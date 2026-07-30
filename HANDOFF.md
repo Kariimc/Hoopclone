@@ -661,6 +661,54 @@ judge the character in motion rather than a single still.
   hips, so it is a rotation and not a shear) plus a wider yaw scatter. One model
   stamped out several hundred times reads as one person repeated; per-fan pose is
   what breaks that in a still frame.
+### Session 2026-07-29, part 19 - a measurable animation gate, and what it revealed
+
+The owner asked for the animation to be judged against real basketball rather than
+by eye. The best reference available is the recording itself: a real person wearing
+markers. Agreement with THEM is the definition of natural motion here, and it is
+objective rather than a matter of taste.
+
+`tools/mocap/verify_clip.py` compares a finished clip against the performer frame
+by frame and reports, per bone, the angle between how far the character rotated
+that joint from its own bind pose and how far the performer rotated theirs.
+
+    blender --background --factory-startup --python tools/mocap/verify_clip.py -- \
+        --clip run --bvh assets/mocap/06_10.bvh --start 120 --end 360
+
+**Two dead ends in building the metric itself, both recorded:**
+- Comparing raw bone DIRECTIONS is unfair - the skeletons hold the same joint at
+  different rest angles, so a perfect copy still reads tens of degrees apart.
+- Deriving rest orientation from `tail_local - head_local` is unusable on this
+  rig; the tail data is garbage (bones of 2,000+ units on a 170-unit body). Use
+  `matrix_local`.
+
+### What it measured, honestly
+
+On the shipped clips: **legs and feet track the performer at 20-24 degrees mean**
+(the full-rotation transfer) while **the spine and arms sit at 128-162 degrees**
+(direction aiming, which discards twist).
+
+Switching the spine and arms to full rotation drops them to **18-31 degrees** -
+so the maths is right and aiming genuinely throws the upper body away. BUT the
+render then shows the torso facing backwards over a perfect stride, because the
+spine chain inherits the performer's world facing while the undriven hips do not.
+
+Two attempts to reconcile that failed, both verified by rendering:
+- Driving the Hips too: the two skeletons hold the pelvis ~180 degrees apart in
+  bind pose, so the whole character goes upside down.
+- Cancelling the performer's facing with a yaw-only correction taken from the
+  source hips: also upside down, because that quaternion carries a large pitch and
+  the yaw extraction is meaningless on it.
+
+**Shipped state:** the split that RENDERS correctly - full rotation on the leg
+chain, aiming above the waist, neck and head undriven. Upright torso, real stride,
+feet pointing where he travels, arms swinging, level head.
+
+**The open problem, stated plainly:** the upper body does not reproduce the
+performer's motion, and the numbers say so. Fixing it needs the pelvis
+disagreement solved first - a bind-pose alignment step that rotates the source
+skeleton into the target's frame BEFORE any transfer, rather than trying to patch
+it per bone afterwards. That is the next piece of animation work.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`
