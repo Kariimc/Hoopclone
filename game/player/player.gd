@@ -17,6 +17,10 @@ var anim: AnimStateMachine
 var shot: ShotController
 ## Set by the spawner; drives which capture clip the body plays.
 var clip_driver: ClipDriver
+## Set by the scene so a hard cut can squeak. Optional - no audio, no squeak.
+var audio: AudioDirector
+var _last_dir: Vector3 = Vector3.ZERO
+var _squeak_cooldown: float = 0.0
 
 ## Gravity. Neither body ever leaves the ground in this build, but without it a
 ## body that slides into another capsule rides UP it and stays there - that is
@@ -71,6 +75,19 @@ func _physics_process(delta: float) -> void:
 		)
 		if dir.length() > 0.01:
 			move = dir.normalized() * max_speed()
+	# A sneaker squeaks when a moving foot changes direction hard, not simply when
+	# it moves - so this watches the ANGLE between where he was going and where he
+	# is going now, and only above a real speed.
+	_squeak_cooldown = maxf(0.0, _squeak_cooldown - delta)
+	var here := Vector3(velocity.x, 0.0, velocity.z)
+	if audio != null and _squeak_cooldown <= 0.0 and here.length() > 1.6 and _last_dir.length() > 1.6:
+		var turn := _last_dir.normalized().angle_to(here.normalized())
+		if turn > 0.7:
+			audio.on_squeak(clampf(turn / PI, 0.35, 1.0))
+			_squeak_cooldown = 0.22
+	if here.length() > 0.3:
+		_last_dir = here
+
 	velocity.x = move_toward(velocity.x, move.x, accel * delta)
 	velocity.z = move_toward(velocity.z, move.z, accel * delta)
 	if is_on_floor():

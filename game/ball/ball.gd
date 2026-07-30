@@ -10,6 +10,10 @@ class_name Ball
 ## point on/near the rim and bounces off.
 
 signal made
+## Fires the instant the ball touches the floor, whether it is being dribbled or
+## bouncing loose. The audio director listens for this rather than guessing a
+## rhythm, so the sound always lands ON the contact.
+signal bounced(speed: float)
 ## Fires when the ball settles after a miss (bounce has stopped, NOT when the
 ## bounce starts) — this is the "ball is now live for a rebound" moment. Audit
 ## §3.2: fixed before any consumer could lock in the wrong meaning.
@@ -45,6 +49,7 @@ var _hand: Node3D
 var _holder: Node3D
 var _held: bool = false
 var _dribble_phase: float = 0.0
+var _touched_floor: bool = false
 
 ## Put the ball in a hand. `hand` should be a BoneAttachment3D following the
 ## handler's hand bone; `holder` is the body itself, read for speed so the pump
@@ -118,6 +123,7 @@ func _step_bounce(delta: float) -> void:
 	if global_position.y <= rim_radius:
 		global_position.y = rim_radius
 		_bounce_vel.y = -_bounce_vel.y * bounce_damping
+		bounced.emit(clampf(absf(_bounce_vel.y) / 3.0, 0.2, 1.0))
 		if absf(_bounce_vel.y) < 0.6:
 			_bouncing = false  # ball settles -> live for rebound logic
 			missed.emit()
@@ -152,6 +158,12 @@ func _step_hold(delta: float) -> void:
 	# abs(sin) gives a bounce that touches the floor once per beat with a sharp
 	# turnaround, which reads much closer to a real dribble than a smooth wave.
 	var lift: float = absf(sin(_dribble_phase * PI))
+	# The bounce beat crosses zero exactly when the ball meets the floor.
+	if lift < 0.06 and not _touched_floor:
+		_touched_floor = true
+		bounced.emit(clampf(speed / 5.0, 0.25, 1.0))
+	elif lift > 0.35:
+		_touched_floor = false
 	var floor_y: float = ball_radius
 	var top_y: float = maxf(hand_pos.y, floor_y + 0.25)
 	global_position = Vector3(

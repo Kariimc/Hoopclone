@@ -511,6 +511,40 @@ was behind the line.
 Gotcha: anchoring the container itself to the bottom of the screen collapsed it to
 zero size and the whole bug rendered off-screen. A full-rect Control with a
 bottom-aligned VBox inside it is what works.
+### Session 2026-07-29, part 15 - the arena has sound
+
+Ranked second by the council, and for a blunt reason: silence is not read as a
+small budget, it is read as a broken game. Real basketball is sonically dense and
+its absence is instantly wrong even to someone who could not say why.
+
+**The sounds are SYNTHESISED, not downloaded.** Every free basketball SFX pack
+found needed an account (itch.io, Gumroad, ZapSplat) and nothing usable was
+reachable as a direct download. These sounds are physically simple enough to build
+honestly, and building them means no licence, no account and exact control:
+
+`tools/audio/make_sfx.py --out assets/audio` writes 13 files - three dribble
+variants at different hardness, three sneaker squeaks, rim, backboard, swish,
+whistle, buzzer, an 11-second seamless crowd bed and a 3-second crowd roar.
+Fixed RNG seed, so the set is reproducible. The crowd bed cross-fades its own tail
+into its head so the loop has no seam.
+
+`game/audio/audio_director.gd` owns playback. Eight voices pooled, because a
+dribble fires every third of a second and would cut itself off with one player.
+Variants never repeat back to back and pitch is jittered per hit so nothing sounds
+mechanical. A missing file is skipped rather than fatal.
+
+Wiring worth knowing:
+- The ball emits `bounced(speed)` at the exact moment of floor contact - the
+  audio listens for that instead of guessing a rhythm, so the sound lands ON the
+  bounce whether he is dribbling or the ball is loose.
+- Made basket: net first, then the crowd surging under it. Miss: iron, with glass
+  first about a third of the time.
+- The crowd you SEE and the crowd you HEAR ride one dial (`main._set_crowd`), so
+  they cannot drift apart.
+- Sneaker squeaks trigger on the ANGLE between the old and new heading above a
+  real speed, not simply on movement - which is when a shoe actually squeaks.
+- Buzzer on period end, whistle on shot-clock expiry, both from the scorebug's
+  own signals.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

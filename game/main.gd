@@ -24,6 +24,8 @@ var _hoops := HoopBuilder.new()
 var _deck := SeatingDeck.new()
 ## The broadcast bug owns the score and both clocks.
 var _bug: Scorebug3D
+## Everything the arena sounds like.
+var _audio: AudioDirector
 
 func _ready() -> void:
 	var gs := get_node("/root/GameState")
@@ -50,9 +52,24 @@ func _ready() -> void:
 	_spawner.equip_player_shot(self, player, _on_basket_made)
 	_spawner.spawn_defender(self, player, away_team)
 	_spawner.spawn_team_mates(self, player, roster, away_roster, player_team, away_team)
+	if player != null and _audio != null:
+		player.audio = _audio
+
+	var ball := get_node_or_null("Ball") as Ball
+	if ball != null and _audio != null:
+		ball.bounced.connect(_audio.on_dribble)
+		ball.made.connect(_audio.on_made)
+		ball.missed.connect(_audio.on_missed)
+	if _bug != null and _audio != null:
+		_bug.period_ended.connect(func(_p): _audio.on_buzzer())
+		_bug.shot_clock_expired.connect(_audio.on_whistle)
+
 	_crowd.build(self)
 	_arena.build_courtside(self)
 	_deck.build(self)
+	_audio = AudioDirector.new()
+	add_child(_audio)
+
 	_bug = Scorebug3D.new()
 	_bug.home_abbr = player_team
 	_bug.away_abbr = away_team
@@ -71,15 +88,22 @@ func _on_basket_made() -> void:
 			worth = 3 if player.shot.was_three() else 2
 		_bug.score(true, worth)
 
-	# Crowd roars on a make, then eases back to idle.
-	_crowd.set_intensity(1.0)
+	# Crowd roars on a make, then eases back to idle - the bodies in the stands and
+	# the noise from them ride the same dial, so they cannot disagree.
+	_set_crowd(1.0)
 	var tw := create_tween()
-	tw.tween_method(_crowd.set_intensity, 1.0, CrowdBowl.CROWD_IDLE_INTENSITY, 2.5)
+	tw.tween_method(_set_crowd, 1.0, CrowdBowl.CROWD_IDLE_INTENSITY, 2.5)
 
 ## Gameplay hook (Sprint 5): call on a made basket / big play to spike the crowd,
 ## then ease the value back toward idle from the caller. 0 = idle, 1 = roaring.
 func set_crowd_intensity(v: float) -> void:
+	_set_crowd(v)
+
+## One dial for both the crowd you see and the crowd you hear.
+func _set_crowd(v: float) -> void:
 	_crowd.set_intensity(v)
+	if _audio != null:
+		_audio.set_crowd_intensity(v)
 
 ## Roster JSON split by team abbreviation, so both sides can be fielded from one
 ## file. Previously every team was flattened into one list, which is why only the
