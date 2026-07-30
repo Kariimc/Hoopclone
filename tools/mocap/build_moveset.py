@@ -64,6 +64,24 @@ ROOT = r"C:\Users\Kariim\Dev\hoopclone"
 SRC  = cli("--src", os.path.join(ROOT, "assets", "models", "player_noball.glb"))
 GLB  = cli("--glb", os.path.join(ROOT, "assets", "models", "player_animated.glb"))
 MOCAP = os.path.join(ROOT, "assets", "mocap")
+# Stand the body at this height (Blender units, rest pose, mesh bounds) so a
+# swapped-in body arrives the same size as the one it replaces. 0 = leave alone.
+HEIGHT = float(cli("--height", "0") or 0)
+
+# A .glb of clips authored for the SAME rig as the body (Quaternius ships its
+# characters and its animation library separately). Empty = the body's own clips
+# only.
+CLIPS_GLB = cli("--clips", "")
+
+# Clips taken as-is under the game's name, never solved from capture: a clip made
+# FOR a rig always beats one transferred onto it. Each game name lists the action
+# names worth accepting, best first, looked for in the body and then in the clip
+# library.
+FROM_SOURCE = {
+    "idle": ["idle", "Idle_Loop"],
+    "run":  ["run", "Jog_Fwd_Loop", "Sprint_Loop"],
+    "walk": ["walk", "Walk_Loop"],
+}
 
 # clip name -> (bvh trial, first frame, last frame, keep every Nth frame)
 # Trials: 06_02..05 forward dribble, 06_06..07 backward, 06_08..09 sideways,
@@ -91,6 +109,40 @@ MAP = {
     "LeftArm": "LeftArm", "LeftForeArm": "LeftForeArm", "LeftHand": "LeftHand",
     "RightArm": "RightArm", "RightForeArm": "RightForeArm", "RightHand": "RightHand",
 }
+# The same map for a Mixamo-named skeleton - the naming every free rigged body
+# and every free animation library uses. Picked automatically below, so
+# swapping in another Mixamo body needs no edit here. The CMU performer's own
+# names are already Mixamo's minus the prefix, which is why the limbs are a
+# straight pass-through and only the spine chain shifts by one link.
+MAP_MIXAMO = dict(
+    {n: "mixamorig:" + n for n in [
+        "Hips",
+        "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase",
+        "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase",
+        "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+        "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+        "Head",
+    ]},
+    LowerBack="mixamorig:Spine", Spine="mixamorig:Spine1",
+    Spine1="mixamorig:Spine2", Neck1="mixamorig:Neck",
+)
+
+# And for the Universal rig (Unreal's bone names), which is what the public-domain
+# character libraries use. Same reasoning again: only the naming differs.
+MAP_UNIVERSAL = {
+    "Hips": "pelvis",
+    "LowerBack": "spine_01", "Spine": "spine_02", "Spine1": "spine_03",
+    "Neck1": "neck_01", "Head": "Head",
+    "LeftShoulder": "clavicle_l", "LeftArm": "upperarm_l",
+    "LeftForeArm": "lowerarm_l", "LeftHand": "hand_l",
+    "RightShoulder": "clavicle_r", "RightArm": "upperarm_r",
+    "RightForeArm": "lowerarm_r", "RightHand": "hand_r",
+    "LeftUpLeg": "thigh_l", "LeftLeg": "calf_l", "LeftFoot": "foot_l",
+    "LeftToeBase": "ball_l",
+    "RightUpLeg": "thigh_r", "RightLeg": "calf_r", "RightFoot": "foot_r",
+    "RightToeBase": "ball_r",
+}
+
 # Parents before children, so each solve sees its parent already posed.
 ORDER = ["LowerBack", "Spine", "Spine1", "Neck1", "Head",
          "LeftShoulder", "RightShoulder",
@@ -134,8 +186,139 @@ scene = bpy.context.scene
 bpy.ops.import_scene.gltf(filepath=SRC)
 tgt = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
 tgt.name = "PlayerRig"
+
+# Which naming scheme this body uses. Read off the skeleton rather than passed in,
+# so a new body drops in without a flag to remember.
+if any(b.name.startswith("mixamorig:") for b in tgt.data.bones):
+    MAP = MAP_MIXAMO
+    print("MOVESET: target rig is Mixamo-named (%d bones)" % len(tgt.data.bones))
+elif "pelvis" in tgt.data.bones and "spine_01" in tgt.data.bones:
+    MAP = MAP_UNIVERSAL
+    print("MOVESET: target rig is the Universal rig (%d bones)" % len(tgt.data.bones))
+else:
+    print("MOVESET: target rig uses the original naming (%d bones)" % len(tgt.data.bones))
+TGT_HIPS = MAP.get("Hips", "Hips")
+missing = [n for n in MAP.values() if n not in tgt.data.bones]
+if missing:
+    raise RuntimeError("target rig is missing mapped bones: %s" % missing)
+
+# Anything not bound to the skeleton is not part of the body. Downloaded models
+# often carry a leftover object from the scene they were exported from; unskinned,
+# it cannot follow the character and just hangs in the air.
+for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
+    if not any(m.type == 'ARMATURE' for m in ob.modifiers):
+        print("MOVESET: dropped unskinned object '%s' (%d faces)"
+              % (ob.name, len(ob.data.polygons)))
+        bpy.data.objects.remove(ob, do_unlink=True)
+
+def copy_clip(src_arm, act, dst_arm, name):
+    """Copy a clip bone-for-bone from one skeleton onto the same rig.
+
+    Not a retarget and deliberately not one. Both skeletons carry the same bone
+    names in the same hierarchy, so a bone's POSE - its offset from its own rest -
+    already means the same thing on both, whatever the two builds' proportions.
+    Copying that offset frame by frame is exact, and it avoids reinterpreting the
+    clip's curves, which is where every transfer loses fidelity.
+    """
+    src_arm.animation_data_create()
+    src_arm.animation_data.action = act
+    try:
+        if act.slots:
+            src_arm.animation_data.action_slot = act.slots[0]
+    except AttributeError:
+        pass                       # Blender before slotted actions
+
+    shared = [b.name for b in dst_arm.pose.bones if b.name in src_arm.pose.bones]
+    for pb in list(src_arm.pose.bones) + list(dst_arm.pose.bones):
+        pb.rotation_mode = 'QUATERNION'
+
+    out = bpy.data.actions.new(name)
+    out.use_fake_user = True
+    dst_arm.animation_data_create()
+    dst_arm.animation_data.action = out
+
+    first, last = (int(round(v)) for v in act.frame_range)
+    written = 0
+    for f in range(first, last + 1):
+        scene.frame_set(f)
+        written += 1
+        for n in shared:
+            dst_arm.pose.bones[n].matrix_basis = src_arm.pose.bones[n].matrix_basis.copy()
+        for n in shared:
+            pb = dst_arm.pose.bones[n]
+            pb.keyframe_insert("rotation_quaternion", frame=written)
+            pb.keyframe_insert("location", frame=written)
+    print("MOVESET: %-10s <- '%s' from the clip library, %d frames, %d bones"
+          % (name, act.name, written, len(shared)))
+    return out
+
+
+# Clips taken as-is, kept under the game's names. Renamed before the sweep below
+# so the sweep cannot delete them.
+kept = {}
+by_name = {a.name: a for a in bpy.data.actions}
+for game_name, candidates in FROM_SOURCE.items():
+    for candidate in candidates:
+        act = by_name.get(candidate)
+        if act is None:
+            continue
+        act.name = game_name
+        act.use_fake_user = True
+        kept[game_name] = act
+        break
+if kept:
+    print("MOVESET: kept the body's own clips: %s" % ", ".join(sorted(kept)))
 for a in list(bpy.data.actions):
-    bpy.data.actions.remove(a)
+    if a.name not in kept:
+        bpy.data.actions.remove(a)
+
+# A separate library of clips for the same rig, if one was given.
+if CLIPS_GLB:
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=CLIPS_GLB)
+    lib_objects = [o for o in bpy.data.objects if o not in before]
+    lib = next(o for o in lib_objects if o.type == 'ARMATURE')
+    lib_bones = {b.name for b in lib.data.bones}
+    overlap = len(lib_bones & {b.name for b in tgt.data.bones})
+    if overlap < len(MAP):
+        raise RuntimeError("the clip library shares only %d bone names with the body - "
+                           "it was authored for a different rig" % overlap)
+    library = {a.name: a for a in bpy.data.actions if a.name not in kept}
+    print("MOVESET: clip library has %d clips on a matching rig (%d shared bones)"
+          % (len(library), overlap))
+    for game_name, candidates in FROM_SOURCE.items():
+        if game_name in kept:
+            continue
+        act = next((library[c] for c in candidates if c in library), None)
+        if act is None:
+            print("MOVESET: WARN no clip in the library for '%s' (looked for %s)"
+                  % (game_name, ", ".join(candidates)))
+            continue
+        kept[game_name] = copy_clip(lib, act, tgt, game_name)
+    for ob in lib_objects:
+        bpy.data.objects.remove(ob, do_unlink=True)
+    # The library's armature was very likely the active object; the solve loop
+    # below switches mode, which needs one.
+    bpy.context.view_layer.objects.active = tgt
+    tgt.select_set(True)
+    for a in list(bpy.data.actions):
+        if a.name not in kept:
+            bpy.data.actions.remove(a)
+
+# Stand it at the height of the body it replaces. Uniform scale on the roots
+# only: bone rotations are scale-free, so nothing about the transfer changes,
+# and the clips' own keys are left untouched.
+if HEIGHT > 0:
+    zs = [(o.matrix_world @ v.co).z
+          for o in bpy.data.objects if o.type == 'MESH' for v in o.data.vertices]
+    now = (max(zs) - min(zs)) if zs else 0.0
+    if now > 1e-6:
+        k = HEIGHT / now
+        for o in bpy.data.objects:
+            if o.parent is None:
+                o.scale = (o.scale.x * k, o.scale.y * k, o.scale.z * k)
+        bpy.context.view_layer.update()
+        print("MOVESET: height %.3f -> %.3f (x%.4f)" % (now, HEIGHT, k))
 
 
 def rest_world_rotations(ob):
@@ -174,7 +357,7 @@ def fit_alignment(src_heads, src_hips_rot, tgt_heads, tgt_hips_rot):
     s_inv = src_hips_rot.inverted()
     t_inv = tgt_hips_rot.inverted()
     s_org = src_heads["Hips"]
-    t_org = tgt_heads["Hips"]
+    t_org = tgt_heads[TGT_HIPS]
     P = np.array([list(s_inv @ (src_heads[s] - s_org)) for s, _ in pairs], dtype=float)
     Q = np.array([list(t_inv @ (tgt_heads[t] - t_org)) for _, t in pairs], dtype=float)
     # Uniform scale cancels out of the rotation, but only once each cloud is
@@ -248,6 +431,9 @@ LIMB_ALIGN = {}
 made = []
 
 for clip, bvh, start, end, step in CLIPS:
+    if clip in kept:
+        print("MOVESET: %-10s <- the body's own clip (not solved from capture)" % clip)
+        continue
     path = os.path.join(MOCAP, bvh)
     if not os.path.exists(path):
         print("MOVESET: WARN missing %s, skipping %s" % (bvh, clip))
@@ -261,12 +447,12 @@ for clip, bvh, start, end, step in CLIPS:
         SRC_REST = rest_world_rotations(src)
         src_heads = rest_world_heads(src)
         ALIGN, residual = fit_alignment(src_heads, SRC_REST["Hips"],
-                                        TGT_HEADS, TGT_REST["Hips"])
+                                        TGT_HEADS, TGT_REST[TGT_HIPS])
         ax, ang = ALIGN.axis, ALIGN.angle
         print("MOVESET: bind alignment %.1f deg about (%.2f, %.2f, %.2f), residual %.4f"
               % (ang * 57.2957795, ax.x, ax.y, ax.z, residual))
         LIMB_ALIGN = limb_alignments(ALIGN, src_heads, SRC_REST["Hips"],
-                                     TGT_HEADS, TGT_REST["Hips"])
+                                     TGT_HEADS, TGT_REST[TGT_HIPS])
         for n in ORDER:
             q = LIMB_ALIGN.get(n)
             if q is not None:
@@ -274,7 +460,7 @@ for clip, bvh, start, end, step in CLIPS:
                       % (n, (q @ ALIGN.inverted()).angle * 57.2957795))
 
     src_hips_rest_inv = SRC_REST["Hips"].inverted()
-    tgt_hips_rest = TGT_REST["Hips"]
+    tgt_hips_rest = TGT_REST[TGT_HIPS]
     tgt_hips_rest_inv = tgt_hips_rest.inverted()
     arm_inv = tgt.matrix_world.inverted().to_3x3().to_quaternion()
 
@@ -389,6 +575,8 @@ for clip, bvh, start, end, step in CLIPS:
 # The BVH importer leaves its own action behind for every trial read. They are
 # not the character's and exporting them ships four extra skeletons' worth of
 # curves in the game's asset.
+for name, act in kept.items():
+    made.append((name, int(act.frame_range[1] - act.frame_range[0]) + 1))
 keep = {c for c, _ in made}
 for a in list(bpy.data.actions):
     if a.name not in keep:

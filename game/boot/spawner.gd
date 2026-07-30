@@ -5,10 +5,24 @@ class_name Spawner
 ## node: instance with `Spawner.new()`, call methods once from `_ready()`,
 ## passing the scene root to add children to.
 
-## The animated build of the player. It is the SAME model with motion-capture
-## clips baked onto its skeleton (see tools/mocap/retarget_bvh.py); the bare
-## model is the fallback so the scene still runs before any clip is generated.
-const PLAYER_MESH_GLB := "res://assets/models/player_animated.glb"
+## The animated build of the player: a free, already-rigged and skinned body on
+## the standard Mixamo skeleton, carrying its OWN idle/run/walk (authored for
+## that skeleton, so they need no transfer) plus the basketball moves solved from
+## the Carnegie Mellon capture. Built by tools/mocap/build_moveset.py:
+##
+##     blender --background --factory-startup --python tools/mocap/build_moveset.py -- \
+##         --src assets/models/player_cc0.glb \
+##         --clips assets/models/clip_library_cc0.glb \
+##         --glb assets/models/player_cc0_animated.glb --height 1.950
+##
+## Body and clips are both CC0 (public domain, no attribution owed) - Quaternius'
+## Universal Base Characters and Universal Animation Library. Height 1.95 m is a
+## tall player standing on his own 1.9 m collision capsule; the body this replaced
+## was modelled at 2.70 m, which is why he loomed over the hoop.
+##
+## The bare model is the fallback so the scene runs even before any clip has been
+## generated.
+const PLAYER_MESH_GLB := "res://assets/models/player_cc0_animated.glb"
 const PLAYER_MESH_FALLBACK := "res://assets/models/player_base.glb"
 
 ## Which clip a body idles on. Everyone stands and handles the ball until the
@@ -330,9 +344,14 @@ func _ball_visual() -> Node3D:
 
 ## A node that follows the handler's ball hand, created once per body.
 ##
-## The ball is carried in the LEFT hand on this model - that was measured, not
-## assumed: the welded practice ball that shipped with the mesh sat in LeftHand.
-const BALL_HAND_BONE := "LeftHand"
+## The ball is carried in the LEFT hand - that was measured, not assumed: the
+## welded practice ball that shipped with the original mesh sat in LeftHand.
+## The bone is found by what its name ENDS with, not by an exact match: rigs
+## prefix the same bone differently (Mixamo writes "mixamorig:LeftHand") and
+## Godot rewrites characters it will not allow in a node name during import, so
+## an exact name is the one thing that cannot be relied on. A rig with no such
+## bone is a real error and still warns.
+const BALL_HAND_SUFFIXES := ["lefthand", "hand_l"]
 
 func _hand_socket(body: Node3D) -> Node3D:
 	var existing := body.get_node_or_null("BallHand")
@@ -341,9 +360,13 @@ func _hand_socket(body: Node3D) -> Node3D:
 	var skel := _find_skeleton(body)
 	if skel == null:
 		return null
-	var idx := skel.find_bone(BALL_HAND_BONE)
+	var idx := -1
+	for suffix in BALL_HAND_SUFFIXES:
+		idx = _find_bone_ending(skel, suffix)
+		if idx >= 0:
+			break
 	if idx < 0:
-		push_warning("Spawner: no bone '%s' on this rig" % BALL_HAND_BONE)
+		push_warning("Spawner: no bone ending in any of %s on this rig" % [BALL_HAND_SUFFIXES])
 		return null
 	var att := BoneAttachment3D.new()
 	att.name = "BallHand"
@@ -355,6 +378,14 @@ func _hand_socket(body: Node3D) -> Node3D:
 	body.add_child(alias)
 	alias.remote_path = alias.get_path_to(att)
 	return att
+
+## Index of the first bone whose name ends with `suffix`, ignoring case and any
+## prefix separator the exporter or importer added. -1 when the rig has none.
+func _find_bone_ending(skel: Skeleton3D, suffix: String) -> int:
+	for i in range(skel.get_bone_count()):
+		if skel.get_bone_name(i).to_lower().ends_with(suffix):
+			return i
+	return -1
 
 func _find_skeleton(n: Node) -> Skeleton3D:
 	if n is Skeleton3D:

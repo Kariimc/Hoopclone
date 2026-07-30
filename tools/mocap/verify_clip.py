@@ -77,6 +77,35 @@ JOINTS = {
     "RightToeBase": "RightToeBase",
 }
 
+# The same table for a Mixamo-named skeleton, picked automatically below. Same
+# reasoning as build_moveset.py's MAP_MIXAMO: the performer's own bone names are
+# Mixamo's without the prefix, so only the spine chain shifts by one link.
+JOINTS_MIXAMO = dict(
+    {n: "mixamorig:" + n for n in [
+        "Hips", "Head",
+        "LeftArm", "LeftForeArm", "LeftHand",
+        "RightArm", "RightForeArm", "RightHand",
+        "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftToeBase",
+        "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase",
+    ]},
+    LowerBack="mixamorig:Spine", Spine="mixamorig:Spine1",
+    Spine1="mixamorig:Spine2", Neck1="mixamorig:Neck",
+)
+
+# And the Universal rig (Unreal's bone names), used by the public-domain
+# character libraries.
+JOINTS_UNIVERSAL = {
+    "Hips": "pelvis",
+    "LowerBack": "spine_01", "Spine": "spine_02", "Spine1": "spine_03",
+    "Neck1": "neck_01", "Head": "Head",
+    "LeftArm": "upperarm_l", "LeftForeArm": "lowerarm_l", "LeftHand": "hand_l",
+    "RightArm": "upperarm_r", "RightForeArm": "lowerarm_r", "RightHand": "hand_r",
+    "LeftUpLeg": "thigh_l", "LeftLeg": "calf_l", "LeftFoot": "foot_l",
+    "LeftToeBase": "ball_l",
+    "RightUpLeg": "thigh_r", "RightLeg": "calf_r", "RightFoot": "foot_r",
+    "RightToeBase": "ball_r",
+}
+
 # label -> (joint before, the joint being measured, joint after). The bend is
 # measured AT the middle joint.
 BENDS = [
@@ -113,6 +142,19 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 bpy.ops.import_scene.gltf(filepath=GLB)
 tgt = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
+
+# Which naming scheme the graded body uses. Read off the skeleton, never assumed.
+if any(b.name.startswith("mixamorig:") for b in tgt.data.bones):
+    JOINTS = JOINTS_MIXAMO
+elif "pelvis" in tgt.data.bones and "spine_01" in tgt.data.bones:
+    JOINTS = JOINTS_UNIVERSAL
+# A joint this check cannot find is a joint it silently skips, and a run that
+# skips every joint prints PASS having measured nothing. Refuse to start instead.
+absent = [n for n in JOINTS.values() if n not in tgt.data.bones]
+if absent:
+    raise SystemExit("VERIFY: this rig has no bone(s) %s - the check would grade "
+                     "nothing and report a pass. Fix the name table first." % absent)
+
 act = None
 for a in bpy.data.actions:
     if a.name == CLIP or a.name.endswith(CLIP):
@@ -215,8 +257,10 @@ tgt_id = lambda n: JOINTS.get(n, n)
 # The bind pose of each skeleton - the zero every movement below is measured from.
 SRC_BIND = snapshot(rest_heads(src, SRC_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
                     "Spine1", src_id)
-TGT_BIND = snapshot(rest_heads(tgt, TGT_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
-                    "Spine", tgt_id)
+# Through the table, like every other joint: these are SOURCE names being
+# translated, not literal bone names on the target.
+TGT_BIND = snapshot(rest_heads(tgt, TGT_NAMES), tgt_id("Hips"), tgt_id("LeftUpLeg"),
+                    tgt_id("RightUpLeg"), tgt_id("Spine1"), tgt_id)
 
 tgt.animation_data_create()
 tgt.animation_data.action = act
@@ -245,8 +289,8 @@ for i, sf in enumerate(source_frames):
     s_now = snapshot(posed_heads(src, SRC_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
                      "Spine1", src_id)
     scene.frame_set(out_frame)
-    t_now = snapshot(posed_heads(tgt, TGT_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
-                     "Spine", tgt_id)
+    t_now = snapshot(posed_heads(tgt, TGT_NAMES), tgt_id("Hips"), tgt_id("LeftUpLeg"),
+                     tgt_id("RightUpLeg"), tgt_id("Spine1"), tgt_id)
     compared += 1
 
     for label, _ in BENDS:
@@ -301,6 +345,13 @@ for name, _ in SEGMENTS:
     ref = place_ref.get(name) or [0.0]
     print("VERIFY:   %-15s mean %5.1f   worst %5.1f   (performer moved it %5.1f)%s"
           % (name, mean, max(vals), sum(ref) / len(ref), "   <-- OFF" if off else ""))
+
+graded = sum(1 for l, _ in BENDS if angle_err.get(l))
+graded += sum(1 for n, _ in SEGMENTS if place_err.get(n))
+if graded < len(BENDS) + len(SEGMENTS):
+    raise SystemExit("VERIFY: FAIL - only %d of %d measurements were taken; the "
+                     "rest found no data. A partial grade is not a pass."
+                     % (graded, len(BENDS) + len(SEGMENTS)))
 
 if fails:
     print("VERIFY: FAIL - %d measurement(s) outside tolerance: %s"

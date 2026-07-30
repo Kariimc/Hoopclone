@@ -56,18 +56,12 @@ func apply_team(root: Node, team_id: String, jersey_surface: String = "Jersey") 
 	var uv_matched: bool = bool(kit.get("jersey_uv_matched", false))
 	var tint := _team_tint(kit)
 
+	var dressed := 0
 	for mi in _find_mesh_instances(root):
 		var surf := _surface_index_named(mi, jersey_surface)
 		if surf < 0:
 			continue
-		var mat := StandardMaterial3D.new()
-		var src := mi.mesh.surface_get_material(surf) as StandardMaterial3D
-		if src != null:
-			mat.albedo_texture = src.albedo_texture
-			mat.normal_enabled = src.normal_enabled
-			mat.normal_texture = src.normal_texture
-			mat.roughness = src.roughness
-			mat.metallic = src.metallic
+		var mat := _copy_surface_material(mi, surf)
 		if uv_matched:
 			_assign_tex(mat, "albedo", kit.get("jersey_albedo", ""))
 			if kit.has("jersey_normal"):
@@ -76,6 +70,33 @@ func apply_team(root: Node, team_id: String, jersey_surface: String = "Jersey") 
 		else:
 			mat.albedo_color = tint
 		mi.set_surface_override_material(surf, mat)
+		dressed += 1
+
+	# No surface carried the kit's name. That is normal for a body authored
+	# elsewhere - it names its surfaces after its own materials - and leaving it
+	# bare puts both teams on the floor in the same colour, which is exactly what
+	# this wash exists to prevent. So wash everything it has instead.
+	if dressed == 0 and not uv_matched:
+		for mi in _find_mesh_instances(root):
+			if mi.mesh == null:
+				continue
+			for i in range(mi.mesh.get_surface_count()):
+				var m := _copy_surface_material(mi, i)
+				m.albedo_color = tint
+				mi.set_surface_override_material(i, m)
+
+## A fresh material carrying over what the model's own surface already had, so a
+## kit change alters colour and nothing else.
+func _copy_surface_material(mi: MeshInstance3D, surf: int) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	var src := mi.mesh.surface_get_material(surf) as StandardMaterial3D
+	if src != null:
+		mat.albedo_texture = src.albedo_texture
+		mat.normal_enabled = src.normal_enabled
+		mat.normal_texture = src.normal_texture
+		mat.roughness = src.roughness
+		mat.metallic = src.metallic
+	return mat
 
 ## A gentle wash of the team's primary colour - enough to tell the sides apart
 ## on a broadcast camera without turning the player into a solid silhouette.

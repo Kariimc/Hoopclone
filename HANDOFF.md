@@ -969,3 +969,102 @@ self-test exists rather than a paragraph promising it works.
 killed by a background job.
 
 Godot self-test: ALL GODOT TESTS PASSED (exit 0), 20 checks. `SFX-CHECK: PASS`.
+
+
+### Session 2026-07-30, part 4 - a public-domain body, and a gate that was lying
+
+The owner: "the player are still weird looking, can we just find a working
+already rigged free 3d body to use in place of the current player." Rendered the
+old body standing and then playing its own clips before touching anything: **the
+model was fine and the motion was not**. Standing, he read as a basketball player.
+The moment `run` or `dribble` played, his feet stayed together, his arms hung, and
+the whole body drifted. A new body alone would have inherited exactly that.
+
+**What is on the floor now.** `assets/models/player_cc0.glb` - Quaternius'
+Universal Base Character (athletic adult male, textured, eyes and brows, 14.4k
+triangles) with `clip_library_cc0.glb`, his Universal Animation Library (43 clips
+on the identical rig). **Both CC0 1.0 - public domain, no attribution owed**,
+mirrored on GitHub at `Dallolz/moorfall-assets`. The build lands as
+`player_cc0_animated.glb` (2.8 MB against the old body's 8.7) and `spawner.gd`
+points every body at it.
+
+A Mixamo body (three.js's Xbot) was built and working first; it was dropped
+because re-distributing a Mixamo asset from a PUBLIC repo is a grey area. Nothing
+of it remains in the tree or in this branch's history. If a Mixamo body is ever
+wanted again, `build_moveset.py` still carries the naming for it.
+
+**The important half: clips authored FOR the rig are never transferred.**
+`FROM_SOURCE` lists the clips taken as-is (idle <- `Idle_Loop`,
+run <- `Jog_Fwd_Loop`, walk <- `Walk_Loop`), and `--clips` accepts a separate
+library .glb built on the same rig. `copy_clip()` copies a clip bone-for-bone -
+each bone's pose is its offset from its own rest, which means the same thing on
+two skeletons carrying the same bone names, so no reinterpretation happens and
+nothing is lost. Standing and running look right for the first time.
+
+Only the basketball moves (dribble, crossover, jump shot) still come from the
+Carnegie Mellon capture through the retarget.
+
+**Height, and why he loomed.** The body is modelled 1.82 units tall and is scaled
+to **1.95** on the way in - a tall player standing on the 1.9 m collision capsule
+the physics already used. The body it replaced was **2.70**, forty percent taller
+than its own capsule, on a court whose rim is at 3.05: that alone made every shot
+and every angle read wrong. `--height` does this and is measured on the mesh
+bounds, so any future body arrives at the same size.
+
+**The gate was passing on nothing.** `verify_clip.py` holds a source->target bone
+table that was hard-wired to the old rig's names. Pointed at any other body it
+found no bones, took no measurements, and printed
+`PASS - every joint bends and points like the performer`. It now (a) reads the
+naming off the skeleton (three schemes: the original, Mixamo, and this Universal
+rig), (b) refuses to start if a mapped bone is absent, and (c) FAILS when fewer
+than all 23 measurements land. A second bug behind it: the body-frame joints
+(hips, both hip sockets, chest) were named literally at the target call sites
+while every other joint went through the table - correct only by coincidence on
+the old rig, and the reason every pointing measurement came back empty.
+
+**Measured, old body -> public-domain body** (readings outside tolerance, 48
+frames each): dribble 7 -> 7, crossover 4 -> 4, jump shot 4 -> 4. Honest reading:
+**the swap did not fix ball handling at all.** The arm transfer is the weak part
+and it is weak on every body. Two method classes are already spent on it
+(rest-relative rotation, then aim-plus-twist); per the two-strike rule the next
+attempt is a proper swing-twist decomposition per joint, or dropping the transfer
+and sourcing basketball clips already built for one of these rigs. Neither free
+library carries basketball: Quaternius' 43 clips are locomotion, combat and
+props; the 880-clip Mixamo mirror (`MisterYI/deevid-mixamo-assets`) has baseball
+and football but no basketball, and its clips are animation-only glTF whose joints
+import as EMPTIES rather than an armature, so they need a node-level transfer
+before they can be used at all.
+
+**Four things that bit, all worth remembering:**
+1. Godot rewrites characters it will not allow in a node name when it imports a
+   rig, so a Mixamo bone is neither `mixamorig:LeftHand` nor `LeftHand` by the
+   time `find_bone` sees it. The ball socket now matches on what a bone name ENDS
+   with, against a list of spellings (`lefthand`, `hand_l`). Before the fix the
+   tests still passed while `Spawner: no hand socket found; the ball will float`
+   scrolled past - a warning nothing asserted on.
+2. The team wash only ever touched a surface literally named "Jersey". A body
+   authored elsewhere names its surfaces after its own materials, so both teams
+   came out identical. `asset_loader.gd` now washes every surface when no named
+   one is found.
+3. Downloaded bodies carry stray geometry from the scene they were exported out
+   of - both of these ship an 80-face sphere. Unskinned geometry cannot follow the
+   character, and it also skewed the height measurement badly enough that the
+   first build came out at 1.74 units instead of 2.70. `build_moveset.py` drops
+   anything with no armature modifier and says what it dropped.
+4. Removing the clip library's objects leaves Blender with no active object, and
+   the solve loop's first act is a mode switch, which needs one. It sets the
+   target active again.
+
+**Proof:** `ALL GODOT TESTS PASSED` (exit 0) after every change, with
+`Player mesh instanced + dressed (CRW) from res://assets/models/player_cc0_animated.glb`
+in the same run; the retarget gate re-run on all three basketball clips with the
+numbers above; renders of idle, run, dribble and jump shot from the shipped .glb.
+
+**Next:** the owner paints skin, face and kit onto this body (both meshes carry
+clean 0-1 UV maps, so nothing has to be unwrapped first), or the ball-handling
+transfer gets the swing-twist attempt.
+
+**Not done:** the watcher (`tools/dev/watch.ps1`) was stopped at the owner's
+request mid-session because rebuild reloads kept taking his window. Restart it
+with `WATCH.bat` when he wants the live window back; `.reload-hold` is left in
+place and expires on its own.
