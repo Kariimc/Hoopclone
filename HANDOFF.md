@@ -899,3 +899,73 @@ with the bass removed - that one number is the owner's complaint, written down.
 audio ones, plus the revert-to-red run quoted above. `SFX-CHECK: PASS` on all
 thirteen files. Nothing was listened to - this machine has no way to play audio
 back into a session - so every claim here is a measurement, not an opinion.
+
+### Session 2026-07-30, part 3 - the window kept closing, and it was the watcher
+
+The owner: "my debug window keeps closing when you make changes so I can't see or
+hear anything." He was watching through a live-reload watcher that lived in a
+scratch folder rather than the repo. Its own log gave the causes; two of them were
+real and the theory that looked most likely was wrong.
+
+**Where the watcher lives now:** `tools/dev/watch.ps1`, with `WATCH.bat` in the
+root to double-click, `tools/dev/hold.py` for build tools to pause it, and
+`tools/dev/watch_selftest.ps1` to prove it still behaves.
+
+**Cause 1 - it reloaded on every single edit,** two seconds after seeing one.
+During active work that is a restart every few seconds: the old log shows four
+launches in fourteen seconds with nobody playing. It now waits for everything to
+hold still for 20 seconds and reloads ONCE at the end of a burst.
+
+**Cause 2 - it quit for good the first time the window went away.** Its final log
+line was `window closed by user; watcher exiting`, and it had not run since 22:57
+the night before - which is why he was seeing nothing at all. One crash or one
+accidental close ended the session permanently. A window that dies inside its
+first 15 seconds is now read as a crash and relaunched (five in a row stops it,
+rather than hiding a broken boot in a restart loop); a long-lived window closing
+is taken as deliberate, and even then the watcher keeps waiting for the next
+change instead of exiting.
+
+**Cause 3 - there was no way to pause it.** A 40-second asset rebuild yanked the
+window away mid-play with nothing on screen to say why. `.reload-hold` now holds
+all reloads while it exists, and the reason written inside it is shown in the
+game's own corner panel. `make_sfx.py` and `build_moveset.py` set it themselves
+via `tools/dev/hold.py`, so the two long rebuilds no longer interrupt anyone. A
+hold older than 15 minutes is ignored, so a tool that dies mid-run cannot freeze
+reloads for good.
+
+**A theory that was wrong, recorded so nobody spends the time again.** The
+five-second restart bursts looked exactly like a self-triggering loop: start the
+game, Godot rewrites an `*.import` sidecar, the watcher sees it and restarts.
+Measured with `watch.ps1 -Probe` either side of a real ten-second windowed run:
+the watched set did not move at all, and not one sidecar was rewritten. The
+bursts were live edits and nothing else. Sidecars are still left out of the watch
+set - they are derived data, so a reload caused by one shows nothing new - but
+that is tidiness, not the fix.
+
+**A bug found by the self-test, not by reading.** Excluding just-written files
+from the fingerprint is what stops the game booting onto a half-written asset. But
+a file rewritten every second stays permanently excluded, so the fingerprint stops
+moving and the set LOOKS settled while the work is still going on - which reloaded
+the window mid-burst, the exact complaint. `Fingerprint` now returns the count of
+in-flight files as well as the stamp, and any non-zero count means "not settled".
+A second one: lifting a hold used to swallow the change, so a finished rebuild was
+never picked up and the window kept playing the old asset. It now starts the
+settle clock instead.
+
+**Proof - `tools/dev/watch_selftest.ps1`, six checks, all green:**
+
+    TEST 1  launches at startup: 1  (want 1)
+    TEST 2  launches after a 6-edit burst: 1  (want 1)
+    TEST 3  crash seen: 1  relaunched: True  (want 1, True)
+    TEST 4  launches while held: 0  (want 0)
+    TEST 5  stale hold ignored: 1  (want 1)  hold file gone: True
+    TEST 6  reloaded once the hold cleared: True  (want True)
+
+Checks 2 and 6 both FAILED on the first pass of the rewrite. That is why the
+self-test exists rather than a paragraph promising it works.
+
+**Convention for every future session:** long rebuilds go inside
+`with reload_hold("what you are doing"):`. Never leave the owner's window to be
+killed by a background job.
+
+Godot self-test: ALL GODOT TESTS PASSED (exit 0), 20 checks. `SFX-CHECK: PASS`.

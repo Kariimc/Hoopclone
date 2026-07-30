@@ -33,3 +33,7 @@ venv/
 
 # Live play recording used to debug a session remotely; never project state.
 /dev_session/
+
+# Dev watcher scratch: which build is running, and why reloads are paused.
+/.watch.log
+/.reload-hold

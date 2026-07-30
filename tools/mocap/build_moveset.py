@@ -53,6 +53,9 @@ import bpy, os, sys
 import numpy as np
 from mathutils import Vector, Quaternion, Euler
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dev"))
+from hold import reload_hold      # pauses the live window while the .glb is written
+
 def cli(n, d=None):
     a = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else []
     return a[a.index(n)+1] if n in a else d
@@ -119,6 +122,12 @@ ALIGN_JOINTS = ["Hips", "LowerBack", "Spine", "Spine1",
                 "LeftArm", "RightArm",
                 "LeftUpLeg", "LeftLeg", "LeftFoot",
                 "RightUpLeg", "RightLeg", "RightFoot"]
+
+# Five clips take about a minute to solve and the .glb lands at the end. Without
+# the hold, the live window reloads onto a half-written model or simply vanishes
+# from under whoever is playing.
+_HOLD = reload_hold("rebuilding the player's moveset")
+_HOLD.__enter__()
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -392,3 +401,4 @@ bpy.ops.export_scene.gltf(filepath=GLB, export_format='GLB', export_apply=False,
                           export_image_format='AUTO')
 print("MOVESET: exported %s (%.1f MB) with %d clips: %s"
       % (GLB, os.path.getsize(GLB)/1048576.0, len(made), ", ".join(c for c, _ in made)))
+_HOLD.__exit__(None, None, None)

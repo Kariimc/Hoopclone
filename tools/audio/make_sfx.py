@@ -31,9 +31,12 @@ said and he was right. Three faults, all fixed here:
    off a shoebox plus a band-split decaying tail - and every sound gets a send to
    it, less for things at your feet, more for things across the court.
 """
-import argparse, math, os, wave
+import argparse, math, os, sys, wave
 import numpy as np
 from scipy import signal
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dev"))
+from hold import reload_hold          # pauses the live window while these are written
 
 SR = 44100
 RNG = np.random.default_rng(20260730)   # fixed, so the set is reproducible
@@ -422,12 +425,7 @@ def write(path, x):
           len(x) / SR, os.path.getsize(path) / 1024.0))
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", required=True)
-    args = ap.parse_args()
-    out = os.path.abspath(args.out)
-    os.makedirs(out, exist_ok=True)
+def build_all(out):
 
     # Variants so a repeated bounce or step never fires the identical file twice.
     for i, h in enumerate([0.93, 1.0, 1.09], start=1):
@@ -441,6 +439,18 @@ def main():
     write(os.path.join(out, "buzzer.wav"), buzzer())
     write(os.path.join(out, "crowd_bed.wav"), crowd_bed())
     write(os.path.join(out, "crowd_roar.wav"), crowd_roar())
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args()
+    out = os.path.abspath(args.out)
+    os.makedirs(out, exist_ok=True)
+    # Thirteen files land over about forty seconds. Without the hold the live
+    # window reloads onto a half-written set, or simply vanishes mid-play.
+    with reload_hold("rebuilding the arena's sound set"):
+        build_all(out)
 
 
 if __name__ == "__main__":
