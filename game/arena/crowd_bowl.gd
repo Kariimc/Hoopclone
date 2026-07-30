@@ -31,6 +31,7 @@ uniform float uv_scale = 4.0;
 uniform float sway_amount = 0.006;
 uniform float sway_speed = 1.2;
 uniform float flash_amount = 1.0;
+uniform float dim = 1.0;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -71,7 +72,7 @@ void fragment() {
 	// Brightness breath: gentle, lifts when hyped.
 	col *= 1.0 + sin(TIME * 1.7) * 0.04 * (0.4 + intensity);
 
-	ALBEDO = col;
+	ALBEDO = col * dim;
 }
 """
 

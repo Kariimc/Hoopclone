@@ -578,6 +578,46 @@ half right - the snap was the threshold flicker, not a missing blend.
 possession change, no out of bounds, no rebound contest and no fouls - which means
 the ball cannot actually be lost. That is the next real feature-shaped work, and
 it is game logic, not art.
+### Session 2026-07-29, part 17 - the lighting pass, and why the assets looked cheap
+
+The owner reported the assets looked cheap and not hyper-realistic. Judged against
+a full-resolution frame (the 640x360 session grabs hide all of this), the models
+were never the problem. Four things were:
+
+1. **Nothing cast a shadow.** Every player floated. This is the single biggest
+   tell in the whole frame.
+2. **The court was matte.** A match-day floor is sealed and buffed to nearly a
+   mirror; a matte plane reads as the wrong material before anyone questions
+   geometry.
+3. **The stands were brighter than the floor** - backwards for a broadcast. A
+   broadcast arena lights the court and lets the stands fall into the dark. That
+   CONTRAST is the look; evenly lit reads as a gym.
+4. **No tone mapping, bloom or occlusion at all**, so the image sat flat.
+
+`game/arena/arena_lighting.gd` fixes all four, engine-side, with no new art:
+shadowed key light, cool fill so the shadow side is not solid black, **eight**
+catwalk spot rigs (more lights at LOWER energy each is what removes the hard cone
+edges a few bright spots leave), ACES tone mapping, restrained bloom, SSAO + SSIL
+for contact darkening, screen-space reflections for the polished floor, a light
+grade, and depth fog so the far stands recede.
+
+It must run LAST in `_ready()` - it reaches into the crowd and floor materials,
+which have to exist by then.
+
+**Tuning notes, both learned the hard way.** The first pass overexposed badly: the
+floor went solid orange and the crowd washed out pale. Broadcast arenas are
+CONTRASTY, not bright. And the source hardwood photo is heavily orange-red, so the
+floor material now multiplies it toward neutral maple - without that it reads as a
+lurid plastic sheet no matter how well it is lit.
+
+### Players now turn to face where they are going
+
+Reported: "the players only face one way even though it is a 3D character." Correct
+and important - none of the three body scripts ever rotated. A body sliding in any
+direction while permanently facing the camera reads as a cardboard cutout being
+dragged around, and it undoes the motion capture entirely. `_face_travel()` in
+player, defender and teammate yaws smoothly toward the direction of travel. Yaw
+only; a basketball player never pitches or rolls.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

@@ -95,6 +95,23 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= _gravity * delta
 	move_and_slide()
+	_face_travel(delta)
 	global_position.x = clampf(global_position.x, -court_half_x, court_half_x)
 	global_position.z = clampf(global_position.z, -court_half_z, court_half_z)
 	anim.update_locomotion(Vector2(velocity.x, velocity.z).length())
+
+## Turn to face where you are going.
+##
+## Without this a body slides in any direction while permanently facing the
+## camera, which is the single most unnatural thing a 3D character can do - it
+## reads as a cardboard cutout being dragged around. Yaw only: a basketball
+## player never pitches or rolls.
+const TURN_RATE := 9.0
+
+func _face_travel(delta: float) -> void:
+	var flat := Vector3(velocity.x, 0.0, velocity.z)
+	if flat.length() < 0.35:
+		return
+	# The model's own forward is -Z, so aim that at the direction of travel.
+	var want := atan2(-flat.x, -flat.z)
+	rotation.y = lerp_angle(rotation.y, want, clampf(delta * TURN_RATE, 0.0, 1.0))

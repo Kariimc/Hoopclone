@@ -35,6 +35,14 @@ func _initialize() -> void:
 		for a in OS.get_environment("HOOP_HOLD").split(",", false):
 			hold.append(a.strip_edges())
 
+	# Judging how a frame looks needs a real frame. A 640x360 grab hides lighting,
+	# reflections and material detail entirely.
+	if OS.has_environment("HOOP_RES"):
+		var parts := OS.get_environment("HOOP_RES").split("x")
+		if parts.size() == 2:
+			DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
+			get_root().set_size(Vector2i(int(parts[0]), int(parts[1])))
+
 	var packed := load("res://game/main.tscn") as PackedScene
 	if packed == null:
 		printerr("DRIVER: failed to load res://game/main.tscn")

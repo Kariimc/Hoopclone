@@ -53,6 +53,9 @@ render_mode cull_disabled;
 uniform float intensity : hint_range(0.0, 1.0) = 0.25;
 uniform sampler2D fan_tex : source_color, filter_linear_mipmap;
 uniform float has_tex = 0.0;
+// Broadcast arenas light the floor and let the stands fall away. Lit as brightly
+// as the court, the crowd competes with the game for attention.
+uniform float dim = 1.0;
 
 // UV2.x says which body part a vertex belongs to - 0 legs, 1 torso, 2 arms,
 // 3 head - and UV2.y how far up that part it sits, so bends pivot from the right
@@ -108,7 +111,7 @@ void fragment() {
 		if (v_part < 0.5) albedo = v_trousers;
 		if (v_part > 1.5) albedo = v_skin;
 	}
-	ALBEDO = albedo;
+	ALBEDO = albedo * dim;
 	ROUGHNESS = 0.85;
 	SPECULAR = 0.15;
 }

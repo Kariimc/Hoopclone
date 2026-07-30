@@ -22,6 +22,7 @@ var _arena := ArenaBuilder.new()
 var _spawner := Spawner.new()
 var _hoops := HoopBuilder.new()
 var _deck := SeatingDeck.new()
+var _light := ArenaLighting.new()
 ## The broadcast bug owns the score and both clocks.
 var _bug: Scorebug3D
 ## Everything the arena sounds like.
@@ -67,6 +68,7 @@ func _ready() -> void:
 	_crowd.build(self)
 	_arena.build_courtside(self)
 	_deck.build(self)
+	_light.build(self)
 	_audio = AudioDirector.new()
 	add_child(_audio)
 
