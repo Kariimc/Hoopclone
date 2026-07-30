@@ -1,9 +1,8 @@
 """Measure a retargeted clip against the human it came from.
 
-Eyeballing a render tells you something is wrong; it does not tell you WHICH bone
+Eyeballing a render tells you something is wrong; it does not tell you WHICH joint
 or by how much. This compares the finished character, frame by frame, against the
-motion-capture performer that drove it, and reports the angle between each pair of
-corresponding bones.
+motion-capture performer that drove it.
 
 That performer is a real person wearing markers, so agreement with them IS the
 definition of natural motion here - there is no better reference available, and it
@@ -12,7 +11,38 @@ is objective rather than a matter of taste.
     blender --background --factory-startup --python verify_clip.py -- \
         --glb player_animated.glb --clip run --bvh 06_10.bvh --start 120 --end 360
 
-Reads FAIL if any driven bone averages more than --tolerance degrees off.
+WHAT IT MEASURES, and the two wrong metrics it had to get past first.
+
+WRONG ONCE: compare each bone's rotation away from its own bind pose. That is
+only meaningful if the two skeletons agree on which way is forward, which they do
+not - and worse, it is precisely the quantity the retarget copies, so it graded
+the transfer against its own formula and passed any bug the formula shared. It
+scored an upside-down character as near-perfect.
+
+WRONG TWICE: compare raw joint bends and joint positions. Honest, but it charges
+the animation for the character's ANATOMY. Measured on the bind poses alone, with
+nobody moving: the performer's elbows are dead straight where the character's rest
+at 30-37 degrees, and their shoulders sit 76-81 degrees apart because one skeleton
+stands in a T-pose and the other in an A-pose. Every one of those degrees showed
+up as animation error.
+
+WHAT IT DOES: compare MOVEMENT - how far each joint travelled from its own bind
+pose - on both skeletons, two ways.
+
+1. BEND. How far the knee, elbow, hip, ankle, shoulder and spine are folded.
+   Purely geometric: no skeleton size, no facing, no rig convention. Read as an
+   absolute, because the retarget now steers each limb at the performer's rather
+   than preserving the character's rest offset - so the angles should agree
+   outright, not merely change together.
+
+2. POINTING, in the body's own frame. Which way each limb segment actually
+   points, measured against the character's own hip line and spine. This is the
+   one that catches a limb on the wrong side of the body: bends are unsigned and
+   happily agree while an arm swings across the chest instead of out to the side.
+   Measured on the shipped build it caught exactly that - the dribbling hand was
+   sitting on the character's LEFT while the performer's was on their right.
+
+Both are reported per joint, and both must pass.
 """
 import bpy, math, os, sys
 from mathutils import Vector
@@ -28,17 +58,55 @@ BVH = cli("--bvh", os.path.join(ROOT, "assets", "mocap", "06_10.bvh"))
 START = int(cli("--start", "120"))
 END = int(cli("--end", "360"))
 STEP = int(cli("--step", "4"))
-TOL = float(cli("--tolerance", "25"))
+# A bend is set by the two limb segments either side of it, so its error is
+# roughly the sum of theirs - it cannot be held to a tighter bar than they are.
+ANGLE_TOL = float(cli("--angle-tolerance", "25"))
+# 20 degrees of pointing error is about a hand's width at the end of an arm.
+DIR_TOL = float(cli("--direction-tolerance", "20"))
 
-# Only bones the retarget actually drives. Neck, head and collarbones are
-# deliberately left at rest, so measuring them would report a failure for a
-# decision that was made on purpose.
-PAIRS = [
-    ("LowerBack", "Spine02"), ("Spine", "Spine01"), ("Spine1", "Spine"),
-    ("LeftArm", "LeftArm"), ("LeftForeArm", "LeftForeArm"),
-    ("RightArm", "RightArm"), ("RightForeArm", "RightForeArm"),
-    ("LeftUpLeg", "LeftUpLeg"), ("LeftLeg", "LeftLeg"), ("LeftFoot", "LeftFoot"),
-    ("RightUpLeg", "RightUpLeg"), ("RightLeg", "RightLeg"), ("RightFoot", "RightFoot"),
+# source bone -> target bone, for every joint this check reads.
+JOINTS = {
+    "Hips": "Hips",
+    "LowerBack": "Spine02", "Spine": "Spine01", "Spine1": "Spine",
+    "Neck1": "neck", "Head": "Head",
+    "LeftArm": "LeftArm", "LeftForeArm": "LeftForeArm", "LeftHand": "LeftHand",
+    "RightArm": "RightArm", "RightForeArm": "RightForeArm", "RightHand": "RightHand",
+    "LeftUpLeg": "LeftUpLeg", "LeftLeg": "LeftLeg", "LeftFoot": "LeftFoot",
+    "LeftToeBase": "LeftToeBase",
+    "RightUpLeg": "RightUpLeg", "RightLeg": "RightLeg", "RightFoot": "RightFoot",
+    "RightToeBase": "RightToeBase",
+}
+
+# label -> (joint before, the joint being measured, joint after). The bend is
+# measured AT the middle joint.
+BENDS = [
+    ("left knee",      ("LeftUpLeg", "LeftLeg", "LeftFoot")),
+    ("right knee",     ("RightUpLeg", "RightLeg", "RightFoot")),
+    ("left hip",       ("Spine1", "LeftUpLeg", "LeftLeg")),
+    ("right hip",      ("Spine1", "RightUpLeg", "RightLeg")),
+    ("left ankle",     ("LeftLeg", "LeftFoot", "LeftToeBase")),
+    ("right ankle",    ("RightLeg", "RightFoot", "RightToeBase")),
+    ("left elbow",     ("LeftArm", "LeftForeArm", "LeftHand")),
+    ("right elbow",    ("RightArm", "RightForeArm", "RightHand")),
+    ("left shoulder",  ("Spine1", "LeftArm", "LeftForeArm")),
+    ("right shoulder", ("Spine1", "RightArm", "RightForeArm")),
+    ("upper spine",    ("LowerBack", "Spine1", "Neck1")),
+]
+
+# Limb segments whose POINTING is checked, as (from joint, to joint).
+SEGMENTS = [
+    ("left thigh",   ("LeftUpLeg", "LeftLeg")),
+    ("left shin",    ("LeftLeg", "LeftFoot")),
+    ("left foot",    ("LeftFoot", "LeftToeBase")),
+    ("right thigh",  ("RightUpLeg", "RightLeg")),
+    ("right shin",   ("RightLeg", "RightFoot")),
+    ("right foot",   ("RightFoot", "RightToeBase")),
+    ("left upper arm",  ("LeftArm", "LeftForeArm")),
+    ("left forearm",    ("LeftForeArm", "LeftHand")),
+    ("right upper arm", ("RightArm", "RightForeArm")),
+    ("right forearm",   ("RightForeArm", "RightHand")),
+    ("lower spine",  ("LowerBack", "Spine1")),
+    ("neck",         ("Neck1", "Head")),
 ]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -53,87 +121,190 @@ for a in bpy.data.actions:
 if act is None:
     raise SystemExit("VERIFY: no clip '%s' in %s (have %s)"
                      % (CLIP, os.path.basename(GLB), [a.name for a in bpy.data.actions]))
-tgt.animation_data_create()
-tgt.animation_data.action = act
 
 bpy.ops.import_anim.bvh(filepath=BVH, global_scale=1.0, use_fps_scale=False,
                         update_scene_fps=False, update_scene_duration=True)
 src = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and o is not tgt)
 
-def world_dir(ob, pb):
-    v = ob.matrix_world.to_3x3() @ (pb.matrix.to_3x3() @ Vector((0, 1, 0)))
-    return v.normalized() if v.length > 1e-8 else Vector((0, 1, 0))
 
+def rest_heads(ob, names):
+    """Where each named joint rests, in world space, before anything moves.
 
-def rest_rotations(ob):
-    """Each bone's resting ORIENTATION in world space, taken from matrix_local.
-
-    Not from tail minus head: this rig's tail data is garbage - bones report
-    lengths of thousands of units on a body 170 units tall - and a metric built on
-    it already sent one investigation down the wrong road for hours. matrix_local
-    is the bind orientation and is reliable."""
+    Joint locations, never bone directions: this rig's tail data is garbage -
+    bones report lengths of thousands of units on a body 170 units tall - and a
+    metric built on it already sent one investigation down the wrong road for
+    hours."""
     out = {}
-    for b in ob.data.bones:
-        out[b.name] = (ob.matrix_world.to_3x3() @ b.matrix_local.to_3x3()).to_quaternion()
+    for n in names:
+        b = ob.data.bones.get(n)
+        if b is not None:
+            out[n] = ob.matrix_world @ b.head_local.copy()
     return out
 
 
-def world_rot(ob, pb):
-    return (ob.matrix_world.to_3x3() @ pb.matrix.to_3x3()).to_quaternion()
+def posed_heads(ob, names):
+    """Where each named joint is right now."""
+    out = {}
+    for n in names:
+        pb = ob.pose.bones.get(n)
+        if pb is not None:
+            out[n] = ob.matrix_world @ pb.head.copy()
+    return out
 
-SRC_REST = rest_rotations(src)
-TGT_REST = rest_rotations(tgt)
 
-# The character's own frames run 1..N while the source runs START..END; walk both.
+def bend(p, a, b, c):
+    """Degrees of bend at joint b. A straight limb reads 0."""
+    if a not in p or b not in p or c not in p:
+        return None
+    u = p[a] - p[b]
+    v = p[c] - p[b]
+    if u.length < 1e-6 or v.length < 1e-6:
+        return None
+    return 180.0 - math.degrees(u.angle(v))
+
+
+def body_frame(p, hips, lhip, rhip, chest):
+    """An axis system belonging to the body itself, not to the world.
+
+    Across the hips, forward out of the chest, and up the spine. Expressing a
+    joint in these axes removes which way the character happens to be facing;
+    dividing by its own height removes how big it is. What is left is the pose."""
+    if any(n not in p for n in (hips, lhip, rhip, chest)):
+        return None
+    across = p[rhip] - p[lhip]
+    up = p[chest] - p[hips]
+    if across.length < 1e-6 or up.length < 1e-6:
+        return None
+    across.normalize()
+    fwd = across.cross(up.normalized())
+    if fwd.length < 1e-6:
+        return None
+    fwd.normalize()
+    return p[hips], (across, fwd, fwd.cross(across).normalized())
+
+
+def pointing(p, frame, a, b):
+    """Which way the segment a->b points, in the body's own axes."""
+    if frame is None or a not in p or b not in p:
+        return None
+    d = p[b] - p[a]
+    if d.length < 1e-6:
+        return None
+    d.normalize()
+    axes = frame[1]
+    return Vector((d.dot(axes[0]), d.dot(axes[1]), d.dot(axes[2])))
+
+
+def snapshot(p, hips, lhip, rhip, chest, name_of):
+    """Every measurement this check needs, taken from one set of joint positions."""
+    frame = body_frame(p, hips, lhip, rhip, chest)
+    bends = {}
+    for label, (a, b, c) in BENDS:
+        bends[label] = bend(p, name_of(a), name_of(b), name_of(c))
+    dirs = {}
+    for label, (a, b) in SEGMENTS:
+        dirs[label] = pointing(p, frame, name_of(a), name_of(b))
+    return bends, dirs
+
+
+SRC_NAMES = list(JOINTS.keys())
+TGT_NAMES = list(JOINTS.values())
+src_id = lambda n: n
+tgt_id = lambda n: JOINTS.get(n, n)
+
+# The bind pose of each skeleton - the zero every movement below is measured from.
+SRC_BIND = snapshot(rest_heads(src, SRC_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
+                    "Spine1", src_id)
+TGT_BIND = snapshot(rest_heads(tgt, TGT_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
+                    "Spine", tgt_id)
+
+tgt.animation_data_create()
+tgt.animation_data.action = act
+try:
+    if act.slots:
+        tgt.animation_data.action_slot = act.slots[0]
+except AttributeError:
+    pass
+
 last = min(END, scene.frame_end)
 source_frames = list(range(max(1, START), last + 1, STEP))
-totals = {}
-worst = {}
+angle_err = {}
+place_err = {}
+# How much the performer moved that joint at all. Without it a "40 degrees off"
+# is unreadable: 40 out of 45 is a broken joint, 40 out of 300 is a wobble.
+angle_ref = {}
+place_ref = {}
+compared = 0
 
 for i, sf in enumerate(source_frames):
     out_frame = i + 1
     if out_frame > int(act.frame_range[1]):
         break
-    scene.frame_set(sf)
-    src_swing = {}
-    for s_name, _ in PAIRS:
-        pb = src.pose.bones.get(s_name)
-        if pb is not None and s_name in SRC_REST:
-            # How far this joint has rotated from its own bind pose.
-            src_swing[s_name] = world_rot(src, pb) @ SRC_REST[s_name].inverted()
 
+    scene.frame_set(sf)
+    s_now = snapshot(posed_heads(src, SRC_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
+                     "Spine1", src_id)
     scene.frame_set(out_frame)
-    for s_name, t_name in PAIRS:
-        s_swing = src_swing.get(s_name)
-        tpb = tgt.pose.bones.get(t_name)
-        if s_swing is None or tpb is None or t_name not in TGT_REST:
+    t_now = snapshot(posed_heads(tgt, TGT_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
+                     "Spine", tgt_id)
+    compared += 1
+
+    for label, _ in BENDS:
+        sa, sb = s_now[0].get(label), SRC_BIND[0].get(label)
+        ta = t_now[0].get(label)
+        if None in (sa, ta):
             continue
-        t_swing = world_rot(tgt, tpb) @ TGT_REST[t_name].inverted()
-        # Angle between the two swings: how differently the character moved that
-        # joint compared with the performer.
-        deg = math.degrees((s_swing.inverted() @ t_swing).angle)
-        if deg > 180.0:
-            deg = 360.0 - deg
-        totals.setdefault(t_name, []).append(deg)
-        if deg > worst.get(t_name, 0.0):
-            worst[t_name] = deg
+        angle_err.setdefault(label, []).append(abs(sa - ta))
+        if sb is not None:
+            # How far the performer folded it away from their own rest, so a
+            # reading of "18 degrees off" can be told from a joint that barely
+            # moved and one that swung through 90.
+            angle_ref.setdefault(label, []).append(abs(sa - sb))
+
+    for label, _ in SEGMENTS:
+        sa, ta = s_now[1].get(label), t_now[1].get(label)
+        if sa is None or ta is None:
+            continue
+        # Absolute pointing, both read in their own body's axes. Bind pose does
+        # not enter into it, so anatomy is never charged as animation error.
+        place_err.setdefault(label, []).append(math.degrees(sa.angle(ta)))
+        sb = SRC_BIND[1].get(label)
+        if sb is not None:
+            place_ref.setdefault(label, []).append(math.degrees(sa.angle(sb)))
 
 print("VERIFY: clip '%s' against %s, %d frames compared"
-      % (CLIP, os.path.basename(BVH), len(source_frames)))
+      % (CLIP, os.path.basename(BVH), compared))
 fails = []
-for _, t_name in PAIRS:
-    vals = totals.get(t_name)
+
+print("VERIFY: -- how far each joint is folded vs the performer (degrees) --")
+for label, _ in BENDS:
+    vals = angle_err.get(label)
     if not vals:
         continue
     mean = sum(vals) / len(vals)
-    flag = "  <-- OFF" if mean > TOL else ""
-    if mean > TOL:
-        fails.append((t_name, mean))
-    print("VERIFY:   %-14s mean %5.1f deg   worst %5.1f deg%s"
-          % (t_name, mean, worst.get(t_name, 0.0), flag))
+    off = mean > ANGLE_TOL
+    if off:
+        fails.append("%s bend %.0f deg" % (label, mean))
+    ref = angle_ref.get(label) or [0.0]
+    print("VERIFY:   %-15s mean %5.1f   worst %5.1f   (performer moved it %5.1f)%s"
+          % (label, mean, max(vals), sum(ref) / len(ref), "   <-- OFF" if off else ""))
+
+print("VERIFY: -- which way each limb points vs the performer (degrees) --")
+for name, _ in SEGMENTS:
+    vals = place_err.get(name)
+    if not vals:
+        continue
+    mean = sum(vals) / len(vals)
+    off = mean > DIR_TOL
+    if off:
+        fails.append("%s points %.0f deg out" % (name, mean))
+    ref = place_ref.get(name) or [0.0]
+    print("VERIFY:   %-15s mean %5.1f   worst %5.1f   (performer moved it %5.1f)%s"
+          % (name, mean, max(vals), sum(ref) / len(ref), "   <-- OFF" if off else ""))
 
 if fails:
-    print("VERIFY: FAIL - %d bone(s) average more than %.0f degrees from the performer: %s"
-          % (len(fails), TOL, ", ".join("%s %.0f" % f for f in fails)))
+    print("VERIFY: FAIL - %d measurement(s) outside tolerance: %s"
+          % (len(fails), ", ".join(fails)))
 else:
-    print("VERIFY: PASS - every driven bone tracks the performer within %.0f degrees" % TOL)
+    print("VERIFY: PASS - every joint bends and points like the performer, within "
+          "%.0f and %.0f degrees" % (ANGLE_TOL, DIR_TOL))

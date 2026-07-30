@@ -734,3 +734,89 @@ it per bone afterwards. That is the next piece of animation work.
   `gh repo list Kariimc` alone. See `Kariimc/my-skills` `rules/10-repo-topology.md`.
 - Never assert an absence, status, or completion without proving your scope was exhaustive.
 - Update this file in the same commit as any code change. A global pre-commit hook enforces it.
+
+### Session 2026-07-30, part 1 - the two skeletons now agree, and the gate was rebuilt
+
+Part 19 ended with the upper body 128-162 degrees off the performer, the fix
+flipping the torso backwards, and a note that the real answer was a bind-pose
+alignment step. That is what this session did, plus two things part 19 could not
+see because its metric was measuring the wrong thing.
+
+**The retarget, `tools/mocap/build_moveset.py`.** One solver now drives every
+bone. The old split - full rotation on the legs, direction aiming above the
+waist, neck and head undriven - is gone, and so is the reason for it.
+
+1. **Pelvis-relative.** Every bone is read against the performer's own hips
+   rather than the capture stage, so a clip carries what the body did and never
+   which way the stage had them pointing. The game turns the character itself.
+   This is what stopped the torso facing backwards, without driving the hips.
+2. **Bind-pose alignment.** One rotation fitted once by Kabsch over the joint
+   POSITIONS the two skeletons share (hips, spine, shoulder sockets, knees,
+   feet), mapping the source bind pose onto the target's. Every delta is
+   conjugated through it. Measured: **118.4 degrees, residual 0.084**.
+3. **Aim, then keep the twist.** Each bone is swung to POINT where the
+   performer's bone points - which fixes where hands and feet end up - and the
+   rotation transfer supplies the twist about the bone's own length, which an
+   aim leaves free. That twist is what makes a foot land flat.
+
+**A trap inside step 3, worth 40 minutes.** A per-limb refinement of the
+alignment was added first (each bone gets the global rotation plus the turn that
+brings its own rest direction onto its counterpart's). Aiming through THAT is a
+no-op to the tenth of a degree, because the per-limb rotation was built from the
+bind difference, so aiming through it just reproduces the character's A-pose
+offset. The aim must use the WHOLE-BODY alignment; the per-limb one is for
+conjugating the delta only. `MOVESET_DEBUG_AIM=1` prints the correction angle per
+bone on frame 5 - that is how the no-op was caught.
+
+**The gate, `tools/mocap/verify_clip.py`, was scoring the broken build as fine,
+so it was rebuilt.** Two wrong metrics, both now written into the file's header:
+
+- *Wrong once (part 19's):* compare each bone's rotation away from its own bind
+  pose. That is the exact quantity the retarget copies, so it graded the transfer
+  against its own formula and passed any bug the formula shared. It scored an
+  upside-down character as near-perfect.
+- *Wrong twice:* compare raw joint bends and joint positions. Honest, but it
+  charges the animation for the character's ANATOMY. Measured on the bind poses
+  alone, with nobody moving: the performer's elbows are dead straight where the
+  character's rest at 30-37 degrees, and the shoulders sit 76-81 degrees apart
+  because one skeleton is a T-pose and the other an A-pose.
+
+It now reads two things in each body's OWN frame (across the hip line, up the
+spine): how far each joint is folded, and which way each limb segment points.
+Geometry, not rotation - blind to bind pose, skeleton size and facing. Every
+reading is printed next to how far the performer moved that joint, so "40 degrees
+off" can be told from a joint that barely moved.
+
+    blender --background --factory-startup --python tools/mocap/verify_clip.py -- \
+        --clip run --bvh assets/mocap/06_10.bvh --start 120 --end 360
+
+### Measured, before -> after (degrees off the performer, run clip)
+
+| | before | after |
+|---|---|---|
+| left / right upper arm | 64 / 77 | **12 / 20** |
+| left / right forearm | 65 / 74 | **22 / 52** |
+| left / right foot | 42 / 43 | **19 / 26** |
+| left / right shin | 22 / 24 | **16 / 18** |
+| right hand placement (dribble) | 1.37 | **0.48** |
+
+Hand placement is in units of hips-to-head. The before figure is larger than the
+distance the performer's hand travelled at all - the dribbling hand was sitting
+on the character's LEFT while the performer's was on their right. That is the
+single grossest error this work removed, and no render caught it; the numbers
+did.
+
+**Still out, honestly.** Across all five clips the gate reports 4-7 readings over
+tolerance, dominated by the **right forearm (38-52 degrees)** and a **left
+shoulder bend around 30**. Two method classes have now been spent on the arms
+(rest-relative rotation, then aim-plus-twist). Per the two-strike rule the next
+attempt should NOT be another correction layer on top: do a proper swing-twist
+decomposition per joint, or accept these and move on.
+
+**Also:** the BVH importer leaves an action behind for every trial it reads, and
+all five were being exported inside the shipped glTF. They are stripped before
+export now.
+
+**Proof:** Godot self-test `ALL GODOT TESTS PASSED` (exit 0). The Python sim
+tests could NOT be run - pytest is not installed on this machine - but nothing
+under `tools/sim` was touched.
