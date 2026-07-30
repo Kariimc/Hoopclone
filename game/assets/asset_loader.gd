@@ -23,8 +23,8 @@ func _load_manifest() -> Dictionary:
 	return data if typeof(data) == TYPE_DICTIONARY else {}
 
 ## Instance the base mesh and dress it in a team's kit. Returns the new node.
-func spawn_player(team_id: String, jersey_surface: String = "Jersey") -> Node3D:
-	var base_path: String = _manifest.get("base_mesh", "")
+func spawn_player(team_id: String, jersey_surface: String = "Jersey", mesh_path: String = "") -> Node3D:
+	var base_path: String = mesh_path if mesh_path != "" else String(_manifest.get("base_mesh", ""))
 	if base_path == "" or not ResourceLoader.exists(base_path):
 		push_warning("AssetLoader: base_mesh missing; spawn a placeholder.")
 		return Node3D.new()
@@ -33,23 +33,58 @@ func spawn_player(team_id: String, jersey_surface: String = "Jersey") -> Node3D:
 	apply_team(inst, team_id, jersey_surface)
 	return inst
 
-## Override jersey albedo/normal on every matching MeshInstance3D in `root`.
+## Dress `root` in a team's kit.
+##
+## IMPORTANT (measured 2026-07-29): the base model is a SINGLE mesh with a
+## SINGLE surface carrying one baked full-body texture - face, arms, shorts and
+## all. The kit files in the manifest are flat 2D garment layouts (front panel,
+## back panel, shorts on a white sheet), NOT textures unwrapped to this model's
+## UVs. Assigning one as the albedo therefore paints the garment artwork across
+## the whole character, face included. That is exactly what it used to do.
+##
+## So a kit swap tints the existing baked texture toward the team's primary
+## colour and leaves the artwork alone. A team entry may opt into a real texture
+## swap by setting `"jersey_uv_matched": true`, which is only correct once
+## somebody authors a kit unwrapped to this model.
 func apply_team(root: Node, team_id: String, jersey_surface: String = "Jersey") -> void:
 	var teams: Dictionary = _manifest.get("teams", {})
 	var kit: Dictionary = teams.get(team_id, {})
 	if kit.is_empty():
 		push_warning("AssetLoader: no kit for team '%s'" % team_id)
 		return
+
+	var uv_matched: bool = bool(kit.get("jersey_uv_matched", false))
+	var tint := _team_tint(kit)
+
 	for mi in _find_mesh_instances(root):
 		var surf := _surface_index_named(mi, jersey_surface)
 		if surf < 0:
 			continue
 		var mat := StandardMaterial3D.new()
-		_assign_tex(mat, "albedo", kit.get("jersey_albedo", ""))
-		if kit.has("jersey_normal"):
-			mat.normal_enabled = true
-			_assign_tex(mat, "normal", kit.get("jersey_normal", ""))
+		var src := mi.mesh.surface_get_material(surf) as StandardMaterial3D
+		if src != null:
+			mat.albedo_texture = src.albedo_texture
+			mat.normal_enabled = src.normal_enabled
+			mat.normal_texture = src.normal_texture
+			mat.roughness = src.roughness
+			mat.metallic = src.metallic
+		if uv_matched:
+			_assign_tex(mat, "albedo", kit.get("jersey_albedo", ""))
+			if kit.has("jersey_normal"):
+				mat.normal_enabled = true
+				_assign_tex(mat, "normal", kit.get("jersey_normal", ""))
+		else:
+			mat.albedo_color = tint
 		mi.set_surface_override_material(surf, mat)
+
+## A gentle wash of the team's primary colour - enough to tell the sides apart
+## on a broadcast camera without turning the player into a solid silhouette.
+func _team_tint(kit: Dictionary) -> Color:
+	var hex: String = String(kit.get("primary", ""))
+	if hex == "" or not hex.begins_with("#"):
+		return Color.WHITE
+	var team := Color(hex)
+	return Color.WHITE.lerp(team, 0.45)
 
 func _assign_tex(mat: StandardMaterial3D, slot: String, path: String) -> void:
 	var resolved := _resolve(path)

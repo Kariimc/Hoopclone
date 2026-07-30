@@ -1,5 +1,6 @@
 extends Node
-class_name GameState
+## Registered as the "GameState" autoload (see project.godot) — reach it globally.
+## No `class_name`: an autoload and a global class may not share a name in Godot 4.
 ## Top-level phase tracker (mirrors the IDP lifecycle the project is built under,
 ## scoped to runtime game flow). Kept deliberately small in Sprint 1 — Season,
 ## Franchise, Commissioner, and CEO layers register their own sub-states later.

@@ -38,11 +38,22 @@ DECISIONS.md) — don't silently re-plan instead of executing.
       references; if the possession loop is pure-data (recommended — see
       audit §5 step 2), this can wait until Step 4 (box score UI) actually
       needs multiple bodies on screen.
-- [ ] **Step 1f — `GameState` wiring** (audit §3.5). NOT done — `GameState` is
-      instanced in `main.gd`, set to `LIVE`, and nothing reads it. Either make
-      it an autoload singleton (Godot's intended pattern) with the scorebug/
-      ticker/sim reading phase from it, or delete it until Step 2 needs it.
-      Small, do it early so nothing else gets built assuming it already works.
+- [x] **Step 1f — `GameState` wiring** (audit §3.5). Done: registered as the
+      `GameState` autoload in `project.godot`; `class_name GameState` dropped from
+      `game/core/game_state.gd` (Godot 4 forbids an autoload and a global class
+      sharing a name). `main.gd` now sets the phase on the singleton instead of
+      instancing its own copy. Consumers read it: `game/ui/scorebug.gd` and
+      `game/ui/ticker.gd` gained `_game_running()` and stop polling / popping
+      headlines in `BOOT`/`MENU`/`FINAL`; both fall back to the old always-on
+      behaviour when the autoload is absent, so opening either scene on its own
+      still works. Five `gamestate:` cases added to `tests/godot/run_tests.gd`
+      (revert-to-red proved: deleting the same-phase guard turns
+      "re-setting the same phase announces nothing" red).
+      **Gotcha for the next agent:** calling `GameState.set_phase()` by the bare
+      autoload name is a *parse* error ("Cannot call non-static function ...
+      directly") — the parser resolves the name to the script, not the instance.
+      Reach the singleton with `get_node("/root/GameState")` and preload the
+      script only so the `Phase` enum resolves. All three callers use that shape.
 - [ ] **Step 2 — Possession loop (pure sim, no rendering).** `tools/sim/possession.py`:
       shooter selection → shot/contest models → outcome → rebound roll →
       box-score lines. **This is the next real feature-shaped piece of work.**

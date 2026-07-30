@@ -14,6 +14,9 @@ const BOWL_SEGMENTS := 64
 const CROWD_IDLE_INTENSITY := 0.25
 
 var _crowd_mat: ShaderMaterial    # held so gameplay can crank hype later
+## The near rows are real 3D bodies (see crowd_fans.gd); the photo arc is the
+## far bowl behind them. One intensity dial drives both so they react together.
+var _fans := CrowdFans.new()
 
 # Animates the crowd texture: sway, soft glowing camera flashes, brightness
 # breath, and drift to soften tiling. uv_scale is the fan-size dial — HIGHER =
@@ -100,6 +103,7 @@ func build(root: Node3D) -> void:
 	bowl.material_override = mat
 	root.add_child(bowl)
 	print("Crowd arc built: r %.0f-%.0f, arc %.0f deg" % [BOWL_BOTTOM_RADIUS, BOWL_TOP_RADIUS, BOWL_ARC_DEG])
+	_fans.build(root)
 
 ## A vertical curved strip swept over BOWL_ARC_DEG degrees, centered on the far
 ## sideline (-Z) and left open around the near side (+Z) where the camera lives.
@@ -137,3 +141,4 @@ func _make_crowd_arc() -> ArrayMesh:
 func set_intensity(v: float) -> void:
 	if _crowd_mat != null:
 		_crowd_mat.set_shader_parameter("intensity", clampf(v, 0.0, 1.0))
+	_fans.set_intensity(v)

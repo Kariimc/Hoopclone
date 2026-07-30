@@ -55,6 +55,13 @@ func _process(delta: float) -> void:
 		_meter = 0.0
 		_dir = 1.0
 
+## Whether the LAST attempt was from behind the line. The scorebug needs this to
+## award two or three, and the shot itself already worked it out.
+var _last_was_three: bool = false
+
+func was_three() -> bool:
+	return _last_was_three
+
 func release() -> void:
 	if not _charging:
 		return
@@ -86,6 +93,7 @@ func release() -> void:
 	var flight: float = clampf(0.7 + distance * 0.03, 0.7, 1.4)
 	var arc: float = clampf(1.8 + distance * 0.12, 1.8, 3.6)
 	ball.launch(shooter_pos + Vector3(0, 2.0, 0), target, made, arc, flight)
+	_last_was_three = is_three
 	shot_taken.emit(made, prob, is_three)
 
 ## Strongest contest from the registered defenders, in [0, 1]. Works in the

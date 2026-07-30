@@ -10,6 +10,8 @@ class_name NewsTicker
 @export var refire_seconds: float = 12.0
 @export var scroll_width: float = 520.0
 
+const GameStateScript := preload("res://game/core/game_state.gd")
+
 @onready var _http: HTTPRequest = HTTPRequest.new()
 @onready var _track: Label = get_node_or_null("%Track")
 var _headlines: Array = []
@@ -25,7 +27,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_refire += delta
-	if _refire >= refire_seconds and not _headlines.is_empty():
+	if _refire >= refire_seconds and not _headlines.is_empty() and _game_running():
 		_refire = 0.0
 		_pop_next()
 
@@ -35,6 +37,18 @@ func _on_news(_r: int, code: int, _h: PackedStringArray, body: PackedByteArray) 
 	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(data) == TYPE_DICTIONARY:
 		_headlines = data.get("headlines", [])
+
+## Headlines belong to a game in progress — stay quiet in menus and after the
+## final buzzer.
+func _game_running() -> bool:
+	var gs := get_node_or_null("/root/GameState")
+	if gs == null:
+		return true # scene opened on its own, no autoload — behave as before
+	return gs.phase not in [
+		GameStateScript.Phase.BOOT,
+		GameStateScript.Phase.MENU,
+		GameStateScript.Phase.FINAL,
+	]
 
 func _pop_next() -> void:
 	if _track == null or _headlines.is_empty():
