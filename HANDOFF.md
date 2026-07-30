@@ -489,6 +489,28 @@ A BoneAttachment3D follows the LeftHand bone; the ball rides it and pumps to the
 floor and back on a procedural beat that quickens with the handler's speed. It
 settles into the hand when he stops, releases automatically on a shot, and comes
 back to him when the shot resolves.
+### Session 2026-07-29, part 14 - the broadcast scorebug
+
+game/ui/scorebug_3d.gd - team marks, score, quarter, game clock and a 24-second
+shot clock along the bottom. Ranked FIRST by the review council: a player clocks a
+missing scoreboard in about a second, long before they judge any model.
+
+It OWNS the clocks. Anything needing to know whether play is live asks it, rather
+than every system running its own timer and slowly disagreeing. It emits
+period_ended and shot_clock_expired for the possession rules to consume.
+
+Details that matter: the shot clock turns red under five seconds, and the game
+clock switches to tenths inside the last minute, which is what makes a final
+possession feel like one.
+
+A made basket scores through it FIRST, then the crowd reacts - so the roar reads
+as a reaction to the number changing. Worth comes from shot.was_three(), added to
+the shot controller, because the shot model already decided whether the attempt
+was behind the line.
+
+Gotcha: anchoring the container itself to the bottom of the screen collapsed it to
+zero size and the whole bug rendered off-screen. A full-rect Control with a
+bottom-aligned VBox inside it is what works.
 ## Exact next steps
 
 1. **PROGRESS.md step 1e** - roster to 5-on-5 mapping. Still only `roster[0]`

@@ -22,6 +22,8 @@ var _arena := ArenaBuilder.new()
 var _spawner := Spawner.new()
 var _hoops := HoopBuilder.new()
 var _deck := SeatingDeck.new()
+## The broadcast bug owns the score and both clocks.
+var _bug: Scorebug3D
 
 func _ready() -> void:
 	var gs := get_node("/root/GameState")
@@ -51,10 +53,24 @@ func _ready() -> void:
 	_crowd.build(self)
 	_arena.build_courtside(self)
 	_deck.build(self)
+	_bug = Scorebug3D.new()
+	_bug.home_abbr = player_team
+	_bug.away_abbr = away_team
+	add_child(_bug)
+
 	add_child(BuildFeed.new())
 	add_child(SessionRecorder.new())
 
 func _on_basket_made() -> void:
+	# Put it on the board first - the number changing is the whole point of a
+	# basket, and the crowd reaction reads as a reaction TO something.
+	if _bug != null:
+		var player := $Player as Player
+		var worth := 2
+		if player != null and player.shot != null:
+			worth = 3 if player.shot.was_three() else 2
+		_bug.score(true, worth)
+
 	# Crowd roars on a make, then eases back to idle.
 	_crowd.set_intensity(1.0)
 	var tw := create_tween()
