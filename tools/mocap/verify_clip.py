@@ -280,15 +280,18 @@ angle_ref = {}
 place_ref = {}
 compared = 0
 
+# Where the clip actually lives once it has been through a file, which is not
+# necessarily one frame per capture sample - see the note at the top.
+clip_start, clip_end = (float(v) for v in act.frame_range)
+span = max(len(source_frames) - 1, 1)
+
 for i, sf in enumerate(source_frames):
-    out_frame = i + 1
-    if out_frame > int(act.frame_range[1]):
-        break
+    out_frame = clip_start + (clip_end - clip_start) * i / span
 
     scene.frame_set(sf)
     s_now = snapshot(posed_heads(src, SRC_NAMES), "Hips", "LeftUpLeg", "RightUpLeg",
                      "Spine1", src_id)
-    scene.frame_set(out_frame)
+    scene.frame_set(int(out_frame), subframe=out_frame - int(out_frame))
     t_now = snapshot(posed_heads(tgt, TGT_NAMES), tgt_id("Hips"), tgt_id("LeftUpLeg"),
                      tgt_id("RightUpLeg"), tgt_id("Spine1"), tgt_id)
     compared += 1
@@ -316,8 +319,10 @@ for i, sf in enumerate(source_frames):
         if sb is not None:
             place_ref.setdefault(label, []).append(math.degrees(sa.angle(sb)))
 
-print("VERIFY: clip '%s' against %s, %d frames compared"
-      % (CLIP, os.path.basename(BVH), compared))
+print("VERIFY: clip '%s' against %s, %d frames compared "
+      "(capture %d..%d against clip frames %.0f..%.0f)"
+      % (CLIP, os.path.basename(BVH), compared, source_frames[0], source_frames[-1],
+         clip_start, clip_end))
 fails = []
 
 print("VERIFY: -- how far each joint is folded vs the performer (degrees) --")

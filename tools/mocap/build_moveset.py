@@ -170,6 +170,9 @@ CHILD = {
 INHERIT = {"Head": "Neck1", "LeftHand": "LeftForeArm", "RightHand": "RightForeArm",
            "LeftToeBase": "LeftFoot", "RightToeBase": "RightFoot"}
 
+# Whatever is nearest the boards decides where the floor is.
+GROUND = ["LeftFoot", "LeftToeBase", "RightFoot", "RightToeBase"]
+
 ALIGN_JOINTS = ["Hips", "LowerBack", "Spine", "Spine1",
                 "LeftArm", "RightArm",
                 "LeftUpLeg", "LeftLeg", "LeftFoot",
@@ -465,6 +468,40 @@ for clip, bvh, start, end, step in CLIPS:
     arm_inv = tgt.matrix_world.inverted().to_3x3().to_quaternion()
 
     last = min(end, scene.frame_end)
+
+    # How high the performer's lowest foot is on every frame we are about to
+    # use, and the lowest it ever gets - the floor of this capture. Read before
+    # anything is solved, because it costs nothing here and the solve needs it.
+    src_lift = {}
+    for f in range(max(1, start), last + 1, step):
+        scene.frame_set(f)
+        heights = [(src.matrix_world @ src.pose.bones[n].head).z
+                   for n in GROUND if n in src.pose.bones]
+        if heights:
+            src_lift[f] = min(heights)
+    _low = sorted(src_lift.values())
+    src_floor = _low[max(0, int(len(_low) * 0.10) - 1)] if _low else 0.0
+    # One body's leg against the other's, so a tall character is not asked to
+    # crouch by a short performer's centimetres.
+    def _leg(ob, hip, foot):
+        a = ob.data.bones.get(hip)
+        b = ob.data.bones.get(foot)
+        if a is None or b is None:
+            return 0.0
+        return ((ob.matrix_world @ b.head_local) - (ob.matrix_world @ a.head_local)).length
+
+    src_leg = _leg(src, "Hips", "LeftFoot")
+    tgt_leg = _leg(tgt, TGT_HIPS, MAP.get("LeftFoot", ""))
+    if src_leg < 1e-6 or tgt_leg < 1e-6:
+        raise RuntimeError("cannot measure a leg on one of the skeletons "
+                           "(source %.4f, target %.4f) - foot planting would be "
+                           "applied in the wrong units" % (src_leg, tgt_leg))
+    leg_ratio = tgt_leg / src_leg
+    print("MOVESET: leg %.3f (character) / %.3f (performer) = x%.4f for foot planting"
+          % (tgt_leg, src_leg, leg_ratio))
+    tgt_floor = min((tgt.matrix_world @ tgt.data.bones[MAP[n]].head_local).z
+                    for n in GROUND if n in MAP and MAP[n] in tgt.data.bones)
+
     bpy.context.view_layer.objects.active = tgt
     bpy.ops.object.mode_set(mode='POSE')
     for pb in tgt.pose.bones:
@@ -561,8 +598,45 @@ for clip, bvh, start, end, step in CLIPS:
             bpy.context.view_layer.update()
             solves += 1
 
+        if os.environ.get("MOVESET_DEBUG_POSE") and out_frame in (5, 20):
+            for _n in ORDER:
+                _c = CHILD.get(_n)
+                _t, _tc = MAP.get(_n), MAP.get(_c) if _c else None
+                _sp, _spc = src.pose.bones.get(_n), src.pose.bones.get(_c) if _c else None
+                _dp = tgt.pose.bones.get(_t) if _t else None
+                _dpc = tgt.pose.bones.get(_tc) if _tc else None
+                if not (_sp and _spc and _dp and _dpc):
+                    continue
+                _sv = (src.matrix_world @ _spc.head) - (src.matrix_world @ _sp.head)
+                _tv = (tgt.matrix_world @ _dpc.head) - (tgt.matrix_world @ _dp.head)
+                if _sv.length < 1e-6 or _tv.length < 1e-6:
+                    continue
+                _goal = ALIGN @ (src_hips_now_inv @ _sv.normalized())
+                _have = tgt_hips_rest_inv @ _tv.normalized()
+                print("POSEDBG f%-3d %-14s %6.1f deg from goal"
+                      % (out_frame, _n, _goal.angle(_have) * 57.2957795))
+
+        # Everything the solve can leave on a bone, not just the rotation.
+        # `dpb.matrix = ...` sets the bone's whole transform; a translation or a
+        # scale left behind by that is part of the pose, and a channel that is
+        # never keyed does not exist in the exported clip at all.
+        # PLANT. Everything above is angles; this is the one length that matters.
+        hips_pb = tgt.pose.bones.get(TGT_HIPS)
+        if hips_pb is not None and f in src_lift:
+            standing = [(tgt.matrix_world @ tgt.pose.bones[MAP[n]].head).z
+                        for n in GROUND if n in MAP and MAP[n] in tgt.pose.bones]
+            if standing:
+                want_low = tgt_floor + max(0.0, src_lift[f] - src_floor) * leg_ratio
+                dz = want_low - min(standing)
+                world = tgt.matrix_world @ hips_pb.matrix
+                world.translation.z += dz
+                hips_pb.matrix = tgt.matrix_world.inverted() @ world
+                bpy.context.view_layer.update()
+
         for pb in tgt.pose.bones:
             pb.keyframe_insert("rotation_quaternion", frame=out_frame)
+            pb.keyframe_insert("location", frame=out_frame)
+            pb.keyframe_insert("scale", frame=out_frame)
 
     act.use_fake_user = True
     made.append((clip, out_frame))
