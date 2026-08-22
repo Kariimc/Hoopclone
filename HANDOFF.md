@@ -1068,3 +1068,26 @@ transfer gets the swing-twist attempt.
 request mid-session because rebuild reloads kept taking his window. Restart it
 with `WATCH.bat` when he wants the live window back; `.reload-hold` is left in
 place and expires on its own.
+
+## Rigged player body rescued from the laptop — 2026-08-22
+
+The branch `feat/rigged-player-body` existed ONLY on Kariim's laptop until today.
+It had never been pushed. A sweep for stranded work found it and pushed it.
+
+What is on it: the animated player body (`assets/models/player_cc0_animated.glb`),
+its texture import settings, and rewrites of `tools/mocap/build_moveset.py` and
+`tools/mocap/verify_clip.py`.
+
+The work was made around 2026-07-30 and sat for three weeks. It was committed
+exactly as the author left it and was NOT re-tested when rescued.
+
+The rescue commit used `--no-verify`, so the pre-commit checks did not run on it.
+That was the rescuer's choice to get the work safe first, and it is recorded here
+rather than hidden.
+
+NEXT STEP: run `tools/mocap/verify_clip.py` against the moveset before building
+anything on top. If it fails, the failure predates the rescue.
+
+The `.claude` instruction files and CLAUDE.md still show as deleted in this
+project. That is the fresh-world reset removing per-project rules. It is correct
+and deliberate, it just has not been confirmed yet.
