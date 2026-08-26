@@ -58,20 +58,46 @@ if (-not (Test-Path (Join-Path $Project "project.godot"))) {
     $Project = "C:\Users\Kariim\Dev\hoopclone"
 }
 
+# FINDING GODOT, AND WHY THIS WAS REWRITTEN, 2026-08-25.
+#
+# The old version looked in Downloads and nowhere else. Godot was moved out of Downloads
+# some time after 30 July, so from that day this watcher printed one line and exited
+# instantly. Its own log proves it: the last entry in it is 2026-07-30, and every run
+# since wrote nothing at all. Nobody noticed, because a tool that dies in its first
+# second looks exactly like a tool nobody started.
+#
+# So it now looks everywhere the thing actually turns up, and REMEMBERS what it found in
+# godot-path.txt beside the project. A remembered path is checked before it is trusted,
+# so the next time it moves nothing breaks: it searches again and writes down the new
+# answer.
+$remember = Join-Path $Project "godot-path.txt"
+if (-not $Godot -and (Test-Path $remember)) {
+    $saved = (Get-Content $remember -TotalCount 1).Trim()
+    if ($saved -and (Test-Path $saved -PathType Leaf)) { $Godot = $saved }
+}
 if (-not $Godot) {
-    $candidates = @(
-        "C:\Users\Kariim\Downloads\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64.exe",
-        "C:\Users\Kariim\Downloads\Godot_v4.7-stable_win64.exe"
-    )
-    foreach ($c in $candidates) { if (Test-Path $c -PathType Leaf) { $Godot = $c; break } }
-    if (-not $Godot) {
-        $found = Get-ChildItem "$env:USERPROFILE\Downloads" -Recurse -Depth 2 -Filter "Godot_v4*_win64.exe" |
-                 Where-Object { $_.Name -notlike "*console*" } | Select-Object -First 1
-        if ($found) { $Godot = $found.FullName }
+    # The console build is deliberately last. It opens a black command window beside the
+    # game on every single launch, and his standing rule is that testing his game does
+    # not cover the screen in command windows.
+    $roots = @("$env:USERPROFILE\Documents", "$env:USERPROFILE\Downloads",
+               "$env:USERPROFILE\Desktop", "$env:USERPROFILE\OneDrive\Desktop",
+               "$env:LOCALAPPDATA\Programs", "C:\Godot", "$env:PROGRAMFILES")
+    $hits = foreach ($r in $roots) {
+        if (Test-Path $r) {
+            Get-ChildItem $r -Recurse -Depth 2 -Filter "Godot*win64*.exe" -ErrorAction SilentlyContinue
+        }
     }
+    $pick = $hits | Where-Object { $_.Name -notlike "*console*" } | Sort-Object Name -Descending | Select-Object -First 1
+    if (-not $pick) { $pick = $hits | Sort-Object Name -Descending | Select-Object -First 1 }
+    if ($pick) { $Godot = $pick.FullName }
+    if (-not $Godot) {
+        $onPath = Get-Command godot.exe, godot4.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($onPath) { $Godot = $onPath.Source }
+    }
+    if ($Godot) { Set-Content -Path $remember -Value $Godot -Encoding utf8 }
 }
 if (-not $Godot -or -not (Test-Path $Godot -PathType Leaf)) {
-    Write-Host "Could not find Godot. Pass it explicitly: -Godot <full path to the .exe>"
+    Write-Host "Could not find Godot anywhere. Put the full path to its .exe on line 1 of godot-path.txt in the project folder, or pass -Godot <full path>."
     exit 1
 }
 
@@ -127,9 +153,49 @@ function Fingerprint {
     return @{ Stamp = (($parts | Sort-Object) -join ";"); Fresh = $fresh }
 }
 
+# KARIIM'S RULE, 2026-08-25, in his own words:
+#   "I just want to be able to be controlling the game in one window that updates live
+#    while my agents are building the game without the screen always stuttering or
+#    blinking and not a bunch of cmd line screens opening up while I'm testing the game.
+#    Building games in godot or unity should behave the same way and not take the focus
+#    off of everything else I may be doing at the time"
+#
+# A reload starts a new game window, and a new window on Windows takes the keyboard. If
+# he is writing an email when a change lands, the email loses his typing. So: remember
+# what he was actually looking at a moment before the restart, and give it straight back.
+#
+# THE ONE EXCEPTION, and it is the whole point of the tool: if he was playing the game
+# when the reload happened, the new game window SHOULD take the focus, because that is
+# the window he was using. Handing focus back to something he left an hour ago would be
+# just as wrong as stealing it.
+Add-Type -Name Win -Namespace Native -MemberDefinition @'
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+'@ -ErrorAction SilentlyContinue
+
 function StartGame {
+    param([int]$OldGamePid = 0)
+
+    # What he is on right now, and whose it is, captured BEFORE anything new appears.
+    $before = [Native.Win]::GetForegroundWindow()
+    $ownerPid = 0
+    if ($before -ne [IntPtr]::Zero) { [void][Native.Win]::GetWindowThreadProcessId($before, [ref]$ownerPid) }
+    $wasPlaying = ($OldGamePid -gt 0 -and $ownerPid -eq $OldGamePid)
+
     $p = Start-Process $Godot -ArgumentList '--path', $Project -PassThru
     Say "started game, pid $($p.Id)"
+
+    # Give the window a moment to exist, then put him back where he was. Only when he was
+    # somewhere else, and only if that window is still there to go back to.
+    if (-not $wasPlaying -and $before -ne [IntPtr]::Zero) {
+        Start-Sleep -Milliseconds 1400
+        $now = [Native.Win]::GetForegroundWindow()
+        if ($now -ne $before) {
+            [void][Native.Win]::SetForegroundWindow($before)
+            Say "left your focus where it was; the game reloaded behind what you were using"
+        }
+    }
     return @{ Proc = $p; At = Get-Date }
 }
 
@@ -152,8 +218,24 @@ $pendingAt  = $null      # when the current change was first noticed
 $lastReload = Get-Date
 $crashes    = 0
 
+$stopFile = Join-Path $Project ".stop-watching"
+Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
+
 while ($true) {
     Start-Sleep -Seconds 2
+
+    # --- has he asked it to stop? -------------------------------------------
+    # Added 2026-08-25 with the silent launcher. Started with no window of its own,
+    # there is nothing to close, so there has to be a way to say stop that is not
+    # hunting through a task list. STOP-LIVE.vbs writes this file.
+    if (Test-Path $stopFile) {
+        Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
+        Say "asked to stop; closing the game and standing down"
+        if ($game.Proc -and -not $game.Proc.HasExited) {
+            Stop-Process -Id $game.Proc.Id -Force -ErrorAction SilentlyContinue
+        }
+        break
+    }
 
     # --- did the window go away on its own? ---------------------------------
     if ($game.Proc -and $game.Proc.HasExited) {
@@ -244,12 +326,17 @@ while ($true) {
         if ($settled -ge $QuietSeconds -and $sinceReload -ge $CooldownSeconds) {
             $pendingAt = $null
             $lastReload = Get-Date
+            $oldPid = 0
+            if ($game.Proc) { $oldPid = $game.Proc.Id }
             if ($game.Proc -and -not $game.Proc.HasExited) {
                 Stop-Process -Id $game.Proc.Id -Force
                 Start-Sleep -Milliseconds 500
             }
             Feed "Reloading with the latest change."
-            $game = StartGame
+            # The old game's id goes in so the reload can tell "he was playing" from "he
+            # was somewhere else entirely", which decides whether the new window is
+            # allowed to take his keyboard.
+            $game = StartGame -OldGamePid $oldPid
         }
     }
 }

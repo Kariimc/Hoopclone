@@ -6,6 +6,53 @@
 **Seeded:** 2026-07-15 from verified repo state. Sections marked UNVERIFIED were not
 provable from the repo alone - fill them in, do not guess.
 
+## 2026-08-25 - PLAYING IT WHILE IT IS BEING BUILT
+
+**His rule, verbatim:** *"I just want to be able to be controlling the game in one window
+that updates live while my agents are building the game without the screen always
+stuttering or blinking and not a bunch of cmd line screens opening up while I'm testing
+the game. Building games in godot or unity should behave the same way and not take the
+focus off of everything else I may be doing at the time"*
+
+**Double click `PLAY-LIVE.vbs`.** The game opens and stays open while work happens. A
+burst of edits reloads it ONCE at the end, not once per edit. No console window of any
+kind appears. `STOP-LIVE.vbs` stops it, because a silent tool has no window to close.
+
+**A reload never takes his keyboard.** The watcher records the foreground window a moment
+before the restart and restores it afterwards. The one exception, and it is deliberate: if
+he was playing the game when the reload happened, the new game window keeps focus, because
+that is the window he was using.
+
+**THE WATCHER HAD BEEN DEAD SINCE 2026-07-30 AND NOTHING SAID SO.** It looked for Godot in
+`Downloads` only; Godot was moved out of Downloads after that date, so every run printed
+one line and exited in its first second. `.watch.log` ends on 30 July and proves it. It now
+searches Documents, Downloads, both Desktops, Programs, `C:\Godot`, Program Files and PATH,
+prefers the non-console build, and remembers the answer in `godot-path.txt` (gitignored,
+found again automatically if it moves).
+
+**Its self-test did not catch that, which was the worse fault.** Every check counted
+matches in a log that was never cleared, so a watcher that never started still produced
+confident numbers: "launches at startup: 8 (want 1)" was seven lines from July plus one.
+The log is now moved aside before a run, and a new TEST 0 asks whether the watcher is even
+up, stopping the run if it is not.
+
+**Proof, all run 2026-08-25:**
+- `powershell -NoProfile -File tools\dev\watch_selftest.ps1` - TEST 0 through TEST 6 all
+  as wanted (1 launch at startup, 1 after a six-edit burst, crash relaunched, 0 while
+  held, stale hold ignored, reload once the hold cleared).
+- `PLAY-LIVE.vbs` launched with **zero** new console windows, counted live by listing
+  every visible console window while it ran. Godot came up.
+- `STOP-LIVE.vbs` closed the game and removed its own note.
+- The focus rule fired three times during the self-test run: *"left your focus where it
+  was; the game reloaded behind what you were using"*.
+
+**STILL OPEN: Unity.** His rule names Godot *or* Unity. Nothing has been built for Unity
+and no Unity project of his has been looked at.
+
+**ALSO OPEN, and it is a banned road in his ledger (F-73):** `PLAY.bat` runs `git pull`
+and then launches the game, so a double click executes whatever the remote has. Left alone
+here because it is a separate change from this one, but it should not survive.
+
 ## Verified facts
 
 | | |

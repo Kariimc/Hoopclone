@@ -37,3 +37,6 @@ venv/
 # Dev watcher scratch: which build is running, and why reloads are paused.
 /.watch.log
 /.reload-hold
+/.watch.log.before-selftest
+/.stop-watching
+/godot-path.txt
