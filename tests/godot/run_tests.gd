@@ -140,6 +140,22 @@ func _scene_smoke() -> void:
 	_check("audio: the SFX and Crowd buses exist",
 		AudioServer.get_bus_index("SFX") >= 0 and AudioServer.get_bus_index("Crowd") >= 0)
 
+	## QUIET WHEN AWAY. His words, 2026-08-25: "I only closed the debug window because the
+	## sound is weird right now and it was annoying me I would have minimized it if the
+	## sound stopped when I did that". Driven directly rather than by focusing a window,
+	## because this runs headless and there is no window to focus. Both directions are
+	## checked: a mute that never lifts is as broken as one that never fires.
+	var quiet := (preload("res://game/core/quiet_when_away.gd")).new()
+	var was_muted := AudioServer.is_bus_mute(0)
+	quiet.set_away(true)
+	_check("audio: the game goes silent when it is not the window you are using",
+		AudioServer.is_bus_mute(0))
+	quiet.set_away(false)
+	_check("audio: and the sound comes back when you return to it",
+		not AudioServer.is_bus_mute(0))
+	AudioServer.set_bus_mute(0, was_muted)
+	quiet.free()
+
 	scene.queue_free()
 
 func _check(label: String, cond: bool) -> void:

@@ -58,44 +58,15 @@ if (-not (Test-Path (Join-Path $Project "project.godot"))) {
     $Project = "C:\Users\Kariim\Dev\hoopclone"
 }
 
-# FINDING GODOT, AND WHY THIS WAS REWRITTEN, 2026-08-25.
+# FINDING GODOT. The lookup lives in find-godot.ps1 and is shared with PLAY.bat.
 #
-# The old version looked in Downloads and nowhere else. Godot was moved out of Downloads
-# some time after 30 July, so from that day this watcher printed one line and exited
-# instantly. Its own log proves it: the last entry in it is 2026-07-30, and every run
-# since wrote nothing at all. Nobody noticed, because a tool that dies in its first
-# second looks exactly like a tool nobody started.
-#
-# So it now looks everywhere the thing actually turns up, and REMEMBERS what it found in
-# godot-path.txt beside the project. A remembered path is checked before it is trusted,
-# so the next time it moves nothing breaks: it searches again and writes down the new
-# answer.
-$remember = Join-Path $Project "godot-path.txt"
-if (-not $Godot -and (Test-Path $remember)) {
-    $saved = (Get-Content $remember -TotalCount 1).Trim()
-    if ($saved -and (Test-Path $saved -PathType Leaf)) { $Godot = $saved }
-}
-if (-not $Godot) {
-    # The console build is deliberately last. It opens a black command window beside the
-    # game on every single launch, and his standing rule is that testing his game does
-    # not cover the screen in command windows.
-    $roots = @("$env:USERPROFILE\Documents", "$env:USERPROFILE\Downloads",
-               "$env:USERPROFILE\Desktop", "$env:USERPROFILE\OneDrive\Desktop",
-               "$env:LOCALAPPDATA\Programs", "C:\Godot", "$env:PROGRAMFILES")
-    $hits = foreach ($r in $roots) {
-        if (Test-Path $r) {
-            Get-ChildItem $r -Recurse -Depth 2 -Filter "Godot*win64*.exe" -ErrorAction SilentlyContinue
-        }
-    }
-    $pick = $hits | Where-Object { $_.Name -notlike "*console*" } | Sort-Object Name -Descending | Select-Object -First 1
-    if (-not $pick) { $pick = $hits | Sort-Object Name -Descending | Select-Object -First 1 }
-    if ($pick) { $Godot = $pick.FullName }
-    if (-not $Godot) {
-        $onPath = Get-Command godot.exe, godot4.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($onPath) { $Godot = $onPath.Source }
-    }
-    if ($Godot) { Set-Content -Path $remember -Value $Godot -Encoding utf8 }
-}
+# It used to be written out here, and separately in PLAY.bat, and the copy here looked in
+# Downloads and nowhere else. Godot moved out of Downloads some time after 30 July 2026,
+# so from that day this watcher printed one line and exited in its first second. Its own
+# log proves it: the last entry is 2026-07-30 and every run since wrote nothing at all.
+# Nobody noticed, because a tool that dies that fast looks exactly like one nobody started.
+# Two copies of a lookup is two things to go stale, so now there is one.
+if (-not $Godot) { $Godot = & (Join-Path $PSScriptRoot "find-godot.ps1") -Project $Project }
 if (-not $Godot -or -not (Test-Path $Godot -PathType Leaf)) {
     Write-Host "Could not find Godot anywhere. Put the full path to its .exe on line 1 of godot-path.txt in the project folder, or pass -Godot <full path>."
     exit 1

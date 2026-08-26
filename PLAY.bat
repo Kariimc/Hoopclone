@@ -1,10 +1,28 @@
 @echo off
-REM Double-click this to TEST the latest build: it gets the newest version,
-REM then launches the game in Godot 4. (Godot must be installed on this PC.)
-setlocal enabledelayedexpansion
-cd /d "%~dp0"
+REM  PLAY - opens the game. That is all it does.
+REM
+REM  KARIIM'S ORDER, 2026-08-25: "fix PLAY.bat, split the update from the launch".
+REM
+REM  WHAT IT USED TO DO AND WHY THAT WAS WRONG. Both are standing noes in his own ledger
+REM  rather than opinions:
+REM
+REM   1. IT RAN AN UPDATE FIRST. Double-clicking PLAY pulled from the internet and then
+REM      ran whatever came down. That is ledger F-73: a file that updates itself and then
+REM      runs is a file that executes somebody else's lines on his machine. Getting the
+REM      latest is now a separate, deliberate click: GET-LATEST.bat, which already existed
+REM      and already did exactly that job on its own.
+REM
+REM   2. IT DOWNLOADED AN ENGINE WHEN IT COULD NOT FIND ONE. That is ledger F-64: nothing
+REM      installs software on his machine without him saying so. It was also fetching
+REM      Godot 4.3 while this project needs 4.7, so the silent "fix" would have opened his
+REM      game in the wrong engine and left the game looking broken. Missing Godot is now
+REM      reported in plain words, never quietly solved.
+REM
+REM  To play WHILE agents are working on the game, use PLAY-LIVE.vbs instead. It keeps one
+REM  window open, reloads it when work lands, and never takes your keyboard.
 
-REM Project dir = this folder, without the trailing backslash.
+setlocal
+cd /d "%~dp0"
 set "PROJDIR=%~dp0"
 set "PROJDIR=%PROJDIR:~0,-1%"
 
@@ -13,90 +31,40 @@ echo ============================================================
 echo   HoopClone - PLAY
 echo ============================================================
 echo.
-
-REM --- 1) Get the newest build (best-effort; never blocks the launch) ---
-echo Getting the latest build...
-git pull
-if not "%errorlevel%"=="0" (
-  echo.
-  echo  ^(Could not auto-update - launching what you already have.^)
-  echo  Tip: run SAVE-WORK.bat to save your changes, then GET-LATEST.bat.
-)
+echo   This only opens the game.
+echo   To get the newest version first, close this window and
+echo   double-click GET-LATEST.bat, then come back.
 echo.
 
-REM --- 2) Find Godot ---------------------------------------------------------
+REM One lookup, shared with the live watcher, so the two can never disagree about where
+REM Godot is. It remembers what it finds and finds it again if it ever moves.
 set "GODOT="
-
-REM (a) Your override: put the full path to Godot's .exe on line 1 of this file.
-if exist "%~dp0godot-path.txt" set /p GODOT=<"%~dp0godot-path.txt"
-
-REM (b) Already on PATH?
-if not defined GODOT (
-  for %%E in (godot.exe godot4.exe Godot.exe) do (
-    if not defined GODOT where %%E >nul 2>nul && set "GODOT=%%E"
-  )
-)
-
-REM (c) Sitting next to this script?
-if not defined GODOT (
-  for /f "delims=" %%G in ('dir /b /a:-d "%~dp0Godot*.exe" 2^>nul') do (
-    if not defined GODOT set "GODOT=%~dp0%%G"
-  )
-)
-
-REM (d) Common install folders (first match wins).
-if not defined GODOT (
-  for %%D in (
-    "C:\Godot"
-    "%LOCALAPPDATA%\Programs\Godot"
-    "%PROGRAMFILES%\Godot"
-    "%USERPROFILE%\Downloads"
-    "%USERPROFILE%\Desktop"
-  ) do (
-    if not defined GODOT (
-      for /f "delims=" %%G in ('dir /b /a:-d "%%~D\Godot*.exe" 2^>nul') do (
-        if not defined GODOT set "GODOT=%%~D\%%G"
-      )
-    )
-  )
-)
-
-REM (e) Still nothing? Download Godot ourselves, once, into a gitignored folder.
-REM     (Matches the project's Godot 4.3; ~60 MB the first time, then reused.)
-set "GODOT_BIN=%~dp0.godot-bin\Godot_v4.3-stable_win64.exe"
-if not defined GODOT if exist "%GODOT_BIN%" set "GODOT=%GODOT_BIN%"
-if not defined GODOT (
-  echo Godot isn't installed here - downloading it once ^(~60 MB^), please wait...
-  if not exist "%~dp0.godot-bin" mkdir "%~dp0.godot-bin"
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $u='https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_win64.exe.zip'; $z='%~dp0.godot-bin\godot.zip'; Invoke-WebRequest -Uri $u -OutFile $z; Expand-Archive -Path $z -DestinationPath '%~dp0.godot-bin' -Force; Remove-Item $z" 2>nul
-  if exist "%GODOT_BIN%" (
-    set "GODOT=%GODOT_BIN%"
-    echo Got it.
-  )
-)
+for /f "usebackq delims=" %%G in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\dev\find-godot.ps1" -Project "%PROJDIR%"`) do set "GODOT=%%G"
 
 if not defined GODOT goto :no_godot
+if not exist "%GODOT%" goto :no_godot
 
-REM --- 3) Controls + launch -------------------------------------------------
-echo Found Godot: !GODOT!
+echo   Engine: %GODOT%
 echo.
-echo Controls:
 echo   Move ......... W A S D  or  Arrow keys
 echo   Shoot ........ hold SPACE to charge, release near the top of the meter
-echo   Quit ......... close the game window  ^(or Alt+F4^)
+echo   Quit ......... close the game window
 echo.
-echo Launching the game...  (a window will open)
+echo   Opening the game...
 echo.
-"!GODOT!" --path "%PROJDIR%"
+start "" "%GODOT%" --path "%PROJDIR%"
 goto :end
 
 :no_godot
 echo.
-echo *** Couldn't get Godot running automatically. ***
+echo   *** Godot is not on this machine, or it has moved somewhere unusual. ***
 echo.
-echo This almost always means no internet right now (or a firewall/antivirus
-echo blocked the download). Reconnect and double-click PLAY.bat again - it will
-echo finish downloading Godot itself. Nothing for you to install.
+echo   Nothing was downloaded and nothing was changed. Installing things
+echo   without being asked is a standing no.
+echo.
+echo   To fix it: install Godot 4.7, or if you already have it, put the full
+echo   path to its .exe on the first line of a file called godot-path.txt in
+echo   this folder. Everything here picks it up from there.
 echo.
 
 :end

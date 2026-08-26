@@ -6,6 +6,44 @@
 **Seeded:** 2026-07-15 from verified repo state. Sections marked UNVERIFIED were not
 provable from the repo alone - fill them in, do not guess.
 
+## 2026-08-25 (later) - THE LAUNCHER SPLIT, AND SILENCE WHEN YOU LOOK AWAY
+
+**His order:** *"fix PLAY.bat, split the update from the launch"*.
+
+`PLAY.bat` now only opens the game. Two standing noes were in it:
+- It ran `git pull` and then launched, so a double click executed whatever the remote had.
+  That is ledger **F-73**. Getting the latest is `GET-LATEST.bat`, which already existed
+  and already did that job by itself.
+- It **downloaded Godot 4.3 off the internet and ran it** when it could not find one. That
+  is ledger **F-64**, nothing installs software unasked, and it was the wrong version for a
+  4.7 project, so the silent fix would have opened the game in the wrong engine.
+
+**One Godot lookup for everything: `tools/dev/find-godot.ps1`.** The watcher and the
+launcher had a copy each, and one of them looked only in Downloads, which is how the
+watcher died unnoticed for a month. A bug in the first cut of this was caught by running
+it: the download unzips into a FOLDER named `Godot_v4.7-stable_win64.exe`, so the search
+returned the folder and the launcher would have opened Explorer instead of the game. It
+now matches files only.
+
+**His words, same evening:** *"I only closed the debug window because the sound is weird
+right now and it was annoying me I would have minimized it if the sound stopped when I did
+that"*. `game/core/quiet_when_away.gd` is an autoload that mutes the master bus when the
+window loses focus, including when minimised, and unmutes on return. It does not pause:
+the game must keep running so a change can be seen to work.
+
+**NOT FIXED, and it is his game's own audio:** he says the sound itself is "weird right
+now". Nothing here touches what the game plays, only whether you can hear it while looking
+elsewhere.
+
+**Proof, run 2026-08-25:**
+- `godot --headless --path . --script res://tests/godot/run_tests.gd` - **ALL GODOT TESTS
+  PASSED**, exit 0, including the two new ones for silence and its return.
+- `powershell -NoProfile -File tools\dev\watch_selftest.ps1` - TEST 0 through TEST 6 all
+  as wanted, after the watcher was moved onto the shared lookup.
+- `PLAY.bat` launched the game for real ("HoopClone (DEBUG)" window up); the repo did not
+  move and nothing was downloaded.
+- The lookup was proven to recover from a wrong remembered path and from no note at all.
+
 ## 2026-08-25 - PLAYING IT WHILE IT IS BEING BUILT
 
 **His rule, verbatim:** *"I just want to be able to be controlling the game in one window
