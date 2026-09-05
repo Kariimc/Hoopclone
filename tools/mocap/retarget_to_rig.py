@@ -28,7 +28,6 @@ def cli(name, default=None, required=False):
         raise SystemExit(f"missing required argument {name}")
     return default
 
-SRC     = cli("--src", r"C:\Users\Kariim\Dev\hoopclone\assets\models\player_base.glb")
 JOINTS  = cli("--joints", required=True)
 CLIP    = cli("--clip", "captured")
 GLB     = cli("--glb", required=True)

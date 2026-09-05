@@ -51,7 +51,6 @@ def cli(n, d=None):
     a = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else []
     return a[a.index(n)+1] if n in a else d
 
-ROOT = r"C:\Users\Kariim\Dev\hoopclone"
 GLB = cli("--glb", os.path.join(ROOT, "assets", "models", "player_animated.glb"))
 CLIP = cli("--clip", "run")
 BVH = cli("--bvh", os.path.join(ROOT, "assets", "mocap", "06_10.bvh"))

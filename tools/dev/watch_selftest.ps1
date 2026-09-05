@@ -16,7 +16,6 @@
 # Check 2 and check 6 both failed on the first pass of the rewrite, which is the
 # reason this file exists rather than a paragraph promising it works.
 
-$proj = "C:\Users\Kariim\Dev\hoopclone"
 $log  = Join-Path $proj ".watch.log"
 $hold = Join-Path $proj ".reload-hold"
 Remove-Item $hold -Force -ErrorAction SilentlyContinue

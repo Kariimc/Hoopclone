@@ -30,7 +30,6 @@ def cli(n, d=None, required=False):
         raise SystemExit("missing " + n)
     return d
 
-SRC_GLB = cli("--src", r"C:\Users\Kariim\Dev\hoopclone\assets\models\player_base.glb")
 BVH     = cli("--bvh", required=True)
 CLIP    = cli("--clip", "captured")
 GLB     = cli("--glb", required=True)

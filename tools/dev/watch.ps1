@@ -55,7 +55,6 @@ $ErrorActionPreference = "SilentlyContinue"
 
 if (-not $Project) { $Project = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 if (-not (Test-Path (Join-Path $Project "project.godot"))) {
-    $Project = "C:\Users\Kariim\Dev\hoopclone"
 }
 
 # FINDING GODOT. The lookup lives in find-godot.ps1 and is shared with PLAY.bat.

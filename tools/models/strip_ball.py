@@ -3,7 +3,6 @@
 The shipped model has a ball modelled AND textured into the right hand as part of
 the same surface, so it can never bounce - it just follows the hand. The mesh is
 one surface of ~28k verts in ~2.5k disconnected scraps, so selecting the ball as a
-"loose part" does not work.
 
 Two signals together identify it, and either alone would be wrong:
   colour  - sample the albedo texture at each face's UV; basketball leather is a
@@ -20,8 +19,6 @@ def cli(n, d=None):
     a = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else []
     return a[a.index(n)+1] if n in a else d
 
-SRC   = cli("--src", r"C:\Users\Kariim\Dev\hoopclone\assets\models\player_base.glb")
-OUT   = cli("--out", r"C:\Users\Kariim\Dev\hoopclone\assets\models\player_noball.glb")
 DRY   = cli("--dry", "1") == "1"
 RADIUS = float(cli("--radius", "0.30"))
 

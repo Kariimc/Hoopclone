@@ -7,12 +7,10 @@ REM  WHAT IT USED TO DO AND WHY THAT WAS WRONG. Both are standing noes in his ow
 REM  rather than opinions:
 REM
 REM   1. IT RAN AN UPDATE FIRST. Double-clicking PLAY pulled from the internet and then
-REM      ran whatever came down. That is ledger F-73: a file that updates itself and then
 REM      runs is a file that executes somebody else's lines on his machine. Getting the
 REM      latest is now a separate, deliberate click: GET-LATEST.bat, which already existed
 REM      and already did exactly that job on its own.
 REM
-REM   2. IT DOWNLOADED AN ENGINE WHEN IT COULD NOT FIND ONE. That is ledger F-64: nothing
 REM      installs software on his machine without him saying so. It was also fetching
 REM      Godot 4.3 while this project needs 4.7, so the silent "fix" would have opened his
 REM      game in the wrong engine and left the game looking broken. Missing Godot is now
