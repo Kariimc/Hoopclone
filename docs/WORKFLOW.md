@@ -36,9 +36,6 @@ WASD / arrows, hold **Space** to shoot.
 The earlier problems came from having **several copies** of the project on the
 same computer, each missing different files. Keep **one** copy per machine:
 
-- **Laptop:** the canonical copy is `C:\Users\Kariim\Dev\hoopclone`. Delete the others
-  (`C:\Users\Kariim\Dev\hoopclone_repo\...`, `C:\Users\Kariim\Desktop\Work\Dev\hoopclone`, any
-  `Temp\claude\...` copy). Always open Godot on `C:\Users\Kariim\Dev\hoopclone\project.godot`.
 - **Cloud:** it gets its own fresh copy automatically each session.
 
 If you're ever unsure which copy you're in: in Godot, **Project → Open Project
